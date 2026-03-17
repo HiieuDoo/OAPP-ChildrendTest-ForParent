@@ -39,9 +39,7 @@
       ]
     ],
     "extra": {
-      "eas": {
-        "projectId": "kidsparent-hieu-con-hon"
-      }
+      "eas": {}
     }
   }
 }

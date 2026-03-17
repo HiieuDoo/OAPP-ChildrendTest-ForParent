@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Cho phép chạy thủ công từ GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -29,8 +29,17 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Create Expo project (if not exists)
+        run: eas init --id ${{ secrets.EXPO_PROJECT_ID }} --non-interactive
+        continue-on-error: true
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Build Android AAB
         run: eas build --platform android --profile production --non-interactive
+        env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: true
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Notify build URL
-        run: echo "✅ Build started! Check https://expo.dev/accounts/dth.ls98/builds for download link"
+        run: echo "Build complete! Check https://expo.dev/accounts/dth.ls98/builds"
