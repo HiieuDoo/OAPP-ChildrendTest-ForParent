@@ -6,18 +6,24 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
-import { IAP_PRODUCTS } from '../../data/iapProducts';
+import { CREDIT_COSTS } from '../../data/iapProducts';
 import Button from '../../components/Button';
-import { checkPurchase, purchaseProduct } from '../../utils/iapService';
+import { hasAccessToResult, unlockWithCredits, getBalance } from '../../utils/iapService';
 import { getTestResult } from '../../utils/storage';
 import { exportReport } from '../../utils/pdfExport';
 
+const FAMILY_COST = CREDIT_COSTS.FAMILY_REPORT; // 2 credits
+
 export default function FamilyReportScreen({ navigation }) {
-  const [purchased, setPurchased] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(true);
+  const [balance, setBalance] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -29,49 +35,131 @@ export default function FamilyReportScreen({ navigation }) {
   }, [navigation]);
 
   const loadData = async () => {
-    const [hasPurchase, parentingResult, personalityResult, eqResult] = await Promise.all([
-      checkPurchase('family_report_bundle'),
+    const [access, parentingResult, personalityResult, eqResult, bal] = await Promise.all([
+      hasAccessToResult('family'),
       getTestResult('parenting'),
       getTestResult('personality'),
       getTestResult('eq'),
+      getBalance(),
     ]);
 
-    setPurchased(hasPurchase);
+    setHasAccess(access);
     setResults({
       parenting: parentingResult,
       personality: personalityResult,
       eq: eqResult,
     });
+    setBalance(bal);
     setLoading(false);
   };
 
-  const handlePurchase = async () => {
-    const result = await purchaseProduct(
-      'family_report_bundle',
-      () => {
-        Alert.alert('Thành công! 🎉', 'Gói Family Report đã được kích hoạt!', [
-          { text: 'OK', onPress: () => loadData() },
-        ]);
-      },
-      () => Alert.alert('Lỗi', 'Giao dịch không thành công.')
+  const handleUnlock = async () => {
+    if (balance < FAMILY_COST) {
+      Alert.alert(
+        'Không đủ credit 💎',
+        `Bạn cần ${FAMILY_COST} credit để xem báo cáo gia đình.\nSố dư: ${balance.toFixed(1)} credit`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Nạp credit',
+            onPress: () =>
+              navigation.navigate('IAPScreen', {
+                requiredCredits: FAMILY_COST,
+                onSuccess: () => loadData(),
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Xác nhận mở khóa',
+      `Sử dụng ${FAMILY_COST} credit để xem Báo Cáo Gia Đình?\nSố dư: ${balance.toFixed(1)} credit`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận',
+          onPress: async () => {
+            setUnlocking(true);
+            const success = await unlockWithCredits('family', FAMILY_COST);
+            if (success) {
+              await loadData();
+              Alert.alert('Đã mở khóa! 🎉', 'Báo cáo gia đình đã được kích hoạt!');
+            } else {
+              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+            }
+            setUnlocking(false);
+          },
+        },
+      ]
     );
   };
 
   const handleExportFamily = async () => {
-    const exported = await exportReport({ type: 'family', result: results });
-    if (!exported.success) Alert.alert('Lỗi', 'Không thể xuất báo cáo.');
+    if (balance < CREDIT_COSTS.EXPORT_PDF) {
+      Alert.alert(
+        'Không đủ credit',
+        `Cần ${CREDIT_COSTS.EXPORT_PDF} credit để xuất PDF.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Nạp credit',
+            onPress: () => navigation.navigate('IAPScreen', { requiredCredits: CREDIT_COSTS.EXPORT_PDF }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Xác nhận xuất báo cáo',
+      `Sử dụng ${CREDIT_COSTS.EXPORT_PDF} credit để xuất PDF?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xuất',
+          onPress: async () => {
+            setExporting(true);
+            const { spendCredits } = await import('../../utils/storage');
+            const spent = await spendCredits(CREDIT_COSTS.EXPORT_PDF);
+            if (!spent) {
+              Alert.alert('Lỗi', 'Không thể trừ credit.');
+              setExporting(false);
+              return;
+            }
+            const exported = await exportReport({ type: 'family', result: results });
+            setExporting(false);
+            await loadData();
+            if (!exported.success) {
+              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const completedCount = Object.values(results).filter(Boolean).length;
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>‹</Text>
+        <Text style={styles.headerTitle}>Báo Cáo Gia Đình</Text>
+        <TouchableOpacity
+          style={styles.creditBadge}
+          onPress={() => navigation.navigate('IAPScreen', {})}
+        >
+          <Text style={styles.creditText}>💎 {balance.toFixed(1)}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Family Report</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
@@ -82,38 +170,24 @@ export default function FamilyReportScreen({ navigation }) {
           <Text style={styles.bannerDesc}>
             Tổng hợp phân tích từ cả 3 bài test để hiểu sâu hơn về gia đình bạn
           </Text>
-          {purchased && (
+          {hasAccess ? (
             <View style={styles.activeBadge}>
               <Text style={styles.activeBadgeText}>✓ Đã kích hoạt</Text>
+            </View>
+          ) : (
+            <View style={styles.costBadge}>
+              <Text style={styles.costBadgeText}>💎 {FAMILY_COST} credit</Text>
             </View>
           )}
         </View>
 
-        {/* Test Status */}
+        {/* Test Progress */}
         <Text style={styles.sectionTitle}>Tiến Trình Bài Test ({completedCount}/3)</Text>
 
         {[
-          {
-            key: 'parenting',
-            name: 'Phong Cách Nuôi Dạy',
-            emoji: '🧠',
-            color: COLORS.primary,
-            screen: 'ParentingTest',
-          },
-          {
-            key: 'personality',
-            name: 'Tính Cách Con',
-            emoji: '🌟',
-            color: '#FF6B35',
-            screen: 'PersonalityTest',
-          },
-          {
-            key: 'eq',
-            name: 'Chỉ Số EQ',
-            emoji: '💝',
-            color: '#FF69B4',
-            screen: 'EQTest',
-          },
+          { key: 'parenting', name: 'Phong Cách Nuôi Dạy', emoji: '🧠', color: COLORS.primary, screen: 'ParentingTest' },
+          { key: 'personality', name: 'Tính Cách Con', emoji: '🌟', color: '#FF6B35', screen: 'PersonalityTest' },
+          { key: 'eq', name: 'Chỉ Số EQ', emoji: '💝', color: '#FF69B4', screen: 'EQTest' },
         ].map((test) => {
           const hasResult = !!results[test.key];
           return (
@@ -141,8 +215,8 @@ export default function FamilyReportScreen({ navigation }) {
           );
         })}
 
-        {/* Family Report Content */}
-        {purchased ? (
+        {/* Content */}
+        {hasAccess ? (
           <>
             <Text style={styles.sectionTitle}>Báo Cáo Gia Đình</Text>
 
@@ -195,37 +269,54 @@ export default function FamilyReportScreen({ navigation }) {
             )}
 
             <Button
-              title="📄 Xuất PDF Gia Đình"
+              title={exporting ? 'Đang xuất...' : `📄 Xuất PDF (${CREDIT_COSTS.EXPORT_PDF} credit)`}
               onPress={handleExportFamily}
               style={styles.exportBtn}
+              disabled={exporting}
             />
           </>
         ) : (
-          <View style={styles.purchaseCard}>
-            <Text style={styles.purchaseTitle}>Mua Gói Family Report</Text>
-            <Text style={styles.purchaseDesc}>
-              Nhận toàn bộ phân tích cho cả gia đình với giá ưu đãi
+          <View style={styles.lockedCard}>
+            <Text style={styles.lockEmoji}>🔒</Text>
+            <Text style={styles.lockTitle}>Mở Khóa Báo Cáo Gia Đình</Text>
+            <Text style={styles.lockDesc}>
+              Tốn {FAMILY_COST} credit để xem toàn bộ phân tích gia đình kết hợp từ 3 bài test
             </Text>
-            <View style={styles.purchaseFeatures}>
-              {IAP_PRODUCTS.FAMILY_REPORT.features.map((f, i) => (
-                <View key={i} style={styles.purchaseFeatureItem}>
-                  <Text style={[styles.purchaseFeatureCheck, { color: '#4ECDC4' }]}>✓</Text>
-                  <Text style={styles.purchaseFeatureText}>{f}</Text>
+            <View style={styles.lockFeatures}>
+              {[
+                'Tất cả kết quả 3 bài test',
+                'Phân tích tương hợp phụ huynh - con',
+                'Lời khuyên giao tiếp gia đình',
+                'Xuất PDF báo cáo đầy đủ',
+              ].map((f, i) => (
+                <View key={i} style={styles.lockFeatureItem}>
+                  <Text style={styles.lockFeatureCheck}>✓</Text>
+                  <Text style={styles.lockFeatureText}>{f}</Text>
                 </View>
               ))}
             </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.oldPrice}>77.000đ</Text>
-              <Text style={styles.newPrice}>{IAP_PRODUCTS.FAMILY_REPORT.price}</Text>
-              <View style={styles.saveBadge}>
-                <Text style={styles.saveText}>Tiết kiệm 37%</Text>
-              </View>
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Chi phí:</Text>
+              <Text style={styles.costValue}>💎 {FAMILY_COST} credit</Text>
+              {balance < FAMILY_COST && (
+                <Text style={styles.costShort}>
+                  (Thiếu {(FAMILY_COST - balance).toFixed(1)} credit)
+                </Text>
+              )}
             </View>
             <Button
-              title={`Mua Gói Family - ${IAP_PRODUCTS.FAMILY_REPORT.price}`}
-              onPress={handlePurchase}
+              title={unlocking ? 'Đang mở khóa...' : `Mở Khóa Ngay - ${FAMILY_COST} Credit`}
+              onPress={handleUnlock}
+              disabled={unlocking}
               style={{ backgroundColor: '#4ECDC4' }}
             />
+            {balance < FAMILY_COST && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('IAPScreen', { requiredCredits: FAMILY_COST })}
+              >
+                <Text style={styles.buyCreditsLink}>Nạp thêm credit ›</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -238,23 +329,22 @@ export default function FamilyReportScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
+    paddingTop: 52,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 52,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
+    justifyContent: 'space-between',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+  headerTitle: { ...TYPOGRAPHY.h2, color: COLORS.text },
+  creditBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
     ...SHADOWS.sm,
   },
-  backBtnText: { fontSize: 28, color: COLORS.text, lineHeight: 32 },
-  headerTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, flex: 1, textAlign: 'center' },
+  creditText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
   content: { flex: 1, paddingHorizontal: SPACING.lg },
   banner: {
     backgroundColor: '#1A1A2E',
@@ -275,7 +365,15 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   activeBadgeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
-  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
+  costBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.sm,
+  },
+  costBadgeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
+  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm, marginTop: SPACING.sm },
   testStatus: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
@@ -315,7 +413,7 @@ const styles = StyleSheet.create({
   insightText: { ...TYPOGRAPHY.body, color: COLORS.text, lineHeight: 24 },
   bold: { fontWeight: '700', color: COLORS.primary },
   exportBtn: { marginBottom: SPACING.md },
-  purchaseCard: {
+  lockedCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
@@ -323,17 +421,32 @@ const styles = StyleSheet.create({
     borderColor: '#4ECDC4',
     ...SHADOWS.lg,
     marginBottom: SPACING.md,
+    alignItems: 'center',
   },
-  purchaseTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginBottom: 8, textAlign: 'center' },
-  purchaseDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md },
-  purchaseFeatures: { marginBottom: SPACING.md },
-  purchaseFeatureItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  purchaseFeatureCheck: { fontWeight: '700', fontSize: 16 },
-  purchaseFeatureText: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1, lineHeight: 22 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md, justifyContent: 'center' },
-  oldPrice: { ...TYPOGRAPHY.body, color: COLORS.textMuted, textDecorationLine: 'line-through' },
-  newPrice: { fontSize: 24, fontWeight: '800', color: '#4ECDC4' },
-  saveBadge: { backgroundColor: COLORS.secondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
-  saveText: { fontSize: 11, fontWeight: '800', color: COLORS.textInverse },
+  lockEmoji: { fontSize: 48, marginBottom: SPACING.sm },
+  lockTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
+  lockDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md, lineHeight: 22 },
+  lockFeatures: { alignSelf: 'stretch', marginBottom: SPACING.md },
+  lockFeatureItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  lockFeatureCheck: { color: '#4ECDC4', fontWeight: '700', fontSize: 16 },
+  lockFeatureText: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1, lineHeight: 22 },
+  costRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  costLabel: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
+  costValue: { fontSize: 18, fontWeight: '800', color: '#4ECDC4' },
+  costShort: { ...TYPOGRAPHY.caption, color: COLORS.secondary, width: '100%', textAlign: 'center' },
+  buyCreditsLink: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+    marginTop: SPACING.sm,
+    fontWeight: '600',
+  },
   bottomPad: { height: SPACING.xl },
 });

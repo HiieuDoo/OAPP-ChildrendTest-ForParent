@@ -1,13 +1,14 @@
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-export const generatePDFContent = (reportData) => {
+const APP_NAME = 'Mindful Guardian';
+
+export const generateReportContent = (reportData) => {
   const { type, result, childName, childAge } = reportData;
   const date = new Date().toLocaleDateString('vi-VN');
 
-  let content = `
-BÁO CÁO PHÁT TRIỂN TRẺ EM
-KidsParent - Hiểu Con Hơn
+  let content = `BÁO CÁO PHÁT TRIỂN TÂM LÝ GIA ĐÌNH
+${APP_NAME}
 Ngày: ${date}
 ${childName ? `Tên bé: ${childName}` : ''}
 ${childAge ? `Tuổi: ${childAge}` : ''}
@@ -15,63 +16,66 @@ ${childAge ? `Tuổi: ${childAge}` : ''}
 `;
 
   if (type === 'parenting') {
-    content += `
-PHONG CÁCH NUÔI DẠY CON
+    content += `PHONG CÁCH NUÔI DẠY CON
 ========================
 Phong cách chính: ${result.primaryStyle?.name || 'Chưa xác định'}
 Mô tả: ${result.primaryStyle?.description || ''}
 
 ĐIỂM MẠNH:
-${result.primaryStyle?.strengths?.map((s) => `• ${s}`).join('\n') || ''}
+${result.primaryStyle?.strengths?.map((s) => `• ${s}`).join('\n') || 'Không có dữ liệu'}
+
+CẦN CẢI THIỆN:
+${result.primaryStyle?.improvements?.map((s) => `• ${s}`).join('\n') || 'Không có dữ liệu'}
 
 LỜI KHUYÊN:
-${result.primaryStyle?.advice?.map((a) => `• ${a}`).join('\n') || ''}
+${result.primaryStyle?.advice?.map((a, i) => `${i + 1}. ${a}`).join('\n') || 'Không có dữ liệu'}
 `;
   } else if (type === 'personality') {
-    content += `
-TÍNH CÁCH CON
+    content += `TÍNH CÁCH CON
 =============
 Loại tính cách: ${result.primaryType?.name || 'Chưa xác định'} ${result.primaryType?.emoji || ''}
 Mô tả: ${result.primaryType?.description || ''}
 
 ĐẶC ĐIỂM NỔI BẬT:
-${result.primaryType?.traits?.map((t) => `• ${t}`).join('\n') || ''}
+${result.primaryType?.traits?.map((t) => `• ${t}`).join('\n') || 'Không có dữ liệu'}
 `;
   } else if (type === 'eq') {
-    content += `
-CHỈ SỐ EQ (TRÍ TUỆ CẢM XÚC)
+    content += `CHỈ SỐ EQ (TRÍ TUỆ CẢM XÚC)
 ==============================
-Điểm tổng: ${result.totalScore || 0}/60
+Điểm tổng: ${result.totalScore || 0}/${result.maxTotal || 60}
 Mức độ: ${result.level?.level || 'Chưa xác định'}
+Tỷ lệ: ${result.percentage || 0}%
 
 ĐIỂM THEO TỪNG CHIỀU:
 ${
   result.dimensionScores
-    ? Object.entries(result.dimensionScores)
-        .map(([key, val]) => `• ${val.name}: ${val.score}/${val.maxScore}`)
+    ? Object.values(result.dimensionScores)
+        .map((d) => `• ${d.name}: ${d.score}/${d.maxScore} (${d.percentage}%)`)
         .join('\n')
-    : ''
+    : 'Không có dữ liệu'
 }
 `;
   } else if (type === 'family') {
-    content += `
-BÁO CÁO GIA ĐÌNH TOÀN DIỆN
+    content += `BÁO CÁO GIA ĐÌNH TOÀN DIỆN
 ===========================
-Bao gồm phân tích:
-• Phong cách nuôi dạy con
-• Tính cách bé theo độ tuổi
-• Chỉ số EQ của bé
-
-Cảm ơn bạn đã sử dụng KidsParent!
-Tiếp tục đồng hành cùng sự phát triển của con.
 `;
+    if (result.parenting?.result) {
+      content += `\nPhong cách nuôi dạy: ${result.parenting.result.primaryStyle?.name || 'Chưa xác định'}\n`;
+    }
+    if (result.personality?.result) {
+      content += `Tính cách bé: ${result.personality.result.primaryType?.name || 'Chưa xác định'}\n`;
+    }
+    if (result.eq?.result) {
+      content += `Chỉ số EQ: ${result.eq.result.level?.level || 'Chưa xác định'} (${result.eq.result.percentage || 0}%)\n`;
+    }
+    content += `\nCảm ơn bạn đã sử dụng ${APP_NAME}!\nTiếp tục đồng hành cùng sự phát triển của gia đình.\n`;
   }
 
   content += `
 
 ---
-Được tạo bởi KidsParent - Hiểu Con Hơn
-© ${new Date().getFullYear()} KidsParent
+Được tạo bởi ${APP_NAME}
+© ${new Date().getFullYear()} ${APP_NAME}
 `;
 
   return content;
@@ -79,26 +83,42 @@ Tiếp tục đồng hành cùng sự phát triển của con.
 
 export const exportReport = async (reportData) => {
   try {
-    const content = generatePDFContent(reportData);
-    const fileName = `KidsParent_Report_${Date.now()}.txt`;
-    const fileUri = FileSystem.documentDirectory + fileName;
+    const content = generateReportContent(reportData);
+    const timestamp = Date.now();
+    const fileName = `MindfulGuardian_Report_${timestamp}.txt`;
+
+    // Ensure documentDirectory exists
+    const dir = FileSystem.documentDirectory;
+    if (!dir) {
+      return { success: false, error: 'Không thể truy cập bộ nhớ thiết bị' };
+    }
+
+    const fileUri = dir + fileName;
 
     await FileSystem.writeAsStringAsync(fileUri, content, {
       encoding: FileSystem.EncodingType.UTF8,
     });
 
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/plain',
-        dialogTitle: 'Chia sẻ Báo Cáo KidsParent',
-      });
-      return { success: true, fileUri };
-    } else {
-      return { success: false, error: 'Sharing not available' };
+    // Verify file was written
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      return { success: false, error: 'Không thể tạo file báo cáo' };
     }
+
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      return { success: false, error: 'Thiết bị không hỗ trợ chia sẻ file' };
+    }
+
+    await Sharing.shareAsync(fileUri, {
+      mimeType: 'text/plain',
+      dialogTitle: `Chia sẻ Báo Cáo - ${APP_NAME}`,
+      UTI: 'public.plain-text',
+    });
+
+    return { success: true, fileUri };
   } catch (error) {
     console.error('Export error:', error);
-    return { success: false, error };
+    return { success: false, error: error.message || 'Lỗi không xác định' };
   }
 };

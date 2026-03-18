@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "KidsParent - Hiểu Con Hơn",
-    "slug": "parenting-test",
-    "version": "1.0.0",
+    "name": "Mindful Guardian",
+    "slug": "mindful-guardian",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kidsparent.hieuconhon",
+      "bundleIdentifier": "com.mindfulguardian.app",
       "buildNumber": "1"
     },
     "android": {
@@ -21,8 +21,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#6C63FF"
       },
-      "package": "com.kidsparent.hieuconhon",
-      "versionCode": 1,
+      "package": "com.mindfulguardian.app",
+      "versionCode": 2,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",

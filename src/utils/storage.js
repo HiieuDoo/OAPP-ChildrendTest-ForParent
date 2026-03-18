@@ -7,6 +7,8 @@ const KEYS = {
   PURCHASES: 'purchases',
   USER_PROFILE: 'user_profile',
   COMPLETED_TESTS: 'completed_tests',
+  CREDITS: 'user_credits',
+  UNLOCKED_RESULTS: 'unlocked_results',
 };
 
 export const saveTestResult = async (testType, result) => {
@@ -72,6 +74,70 @@ export const hasPurchased = async (productId) => {
     return false;
   }
 };
+
+// ─── Credit System ───────────────────────────────────────────────────────────
+
+export const getCredits = async () => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.CREDITS);
+    return data ? parseFloat(data) : 0;
+  } catch (error) {
+    console.error('getCredits error:', error);
+    return 0;
+  }
+};
+
+export const addCredits = async (amount) => {
+  try {
+    const current = await getCredits();
+    const newBalance = parseFloat((current + amount).toFixed(2));
+    await AsyncStorage.setItem(KEYS.CREDITS, newBalance.toString());
+    return newBalance;
+  } catch (error) {
+    console.error('addCredits error:', error);
+    return false;
+  }
+};
+
+export const spendCredits = async (amount) => {
+  try {
+    const current = await getCredits();
+    if (current < amount) return false;
+    const newBalance = parseFloat((current - amount).toFixed(2));
+    await AsyncStorage.setItem(KEYS.CREDITS, newBalance.toString());
+    return true;
+  } catch (error) {
+    console.error('spendCredits error:', error);
+    return false;
+  }
+};
+
+// ─── Unlocked Results ────────────────────────────────────────────────────────
+
+export const saveUnlockedResult = async (resultType) => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.UNLOCKED_RESULTS);
+    const unlocked = data ? JSON.parse(data) : {};
+    unlocked[resultType] = new Date().toISOString();
+    await AsyncStorage.setItem(KEYS.UNLOCKED_RESULTS, JSON.stringify(unlocked));
+    return true;
+  } catch (error) {
+    console.error('saveUnlockedResult error:', error);
+    return false;
+  }
+};
+
+export const isResultUnlocked = async (resultType) => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.UNLOCKED_RESULTS);
+    const unlocked = data ? JSON.parse(data) : {};
+    return !!unlocked[resultType];
+  } catch (error) {
+    return false;
+  }
+};
+
+// ─── User Profile ─────────────────────────────────────────────────────────────
 
 export const saveUserProfile = async (profile) => {
   try {

@@ -9,36 +9,108 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
 import { EQ_DIMENSIONS, EQ_ADVICE } from '../../data/eqTestData';
-import { IAP_PRODUCTS } from '../../data/iapProducts';
+import { CREDIT_COSTS } from '../../data/iapProducts';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import ScoreRadar from '../../components/ScoreRadar';
-import { hasAccessToResult } from '../../utils/iapService';
+import { hasAccessToResult, unlockWithCredits, getBalance } from '../../utils/iapService';
 import { exportReport } from '../../utils/pdfExport';
+import { spendCredits } from '../../utils/storage';
+
+const COST = CREDIT_COSTS.EQ_RESULT;
+const PDF_COST = CREDIT_COSTS.EXPORT_PDF;
 
 export default function EQResultScreen({ route, navigation }) {
   const { result } = route.params;
   const [hasAccess, setHasAccess] = useState(false);
+  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
     checkAccess();
   }, []);
 
   const checkAccess = async () => {
-    const access = await hasAccessToResult('eq');
+    const [access, bal] = await Promise.all([hasAccessToResult('eq'), getBalance()]);
     setHasAccess(access);
+    setBalance(bal);
   };
 
-  const handleUnlock = () => {
-    navigation.navigate('IAPScreen', {
-      product: IAP_PRODUCTS.EQ_RESULT,
-      onSuccess: () => setHasAccess(true),
-    });
+  const handleUnlock = async () => {
+    if (balance < COST) {
+      Alert.alert(
+        'Không đủ credit 💎',
+        `Cần ${COST} credit để xem kết quả.\nSố dư: ${balance.toFixed(1)} credit`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Nạp credit',
+            onPress: () =>
+              navigation.navigate('IAPScreen', {
+                requiredCredits: COST,
+                onSuccess: () => checkAccess(),
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Xác nhận mở khóa',
+      `Dùng ${COST} credit để xem kết quả EQ?\nSố dư: ${balance.toFixed(1)} credit`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận',
+          onPress: async () => {
+            const success = await unlockWithCredits('eq', COST);
+            if (success) {
+              await checkAccess();
+            } else {
+              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleExport = async () => {
-    const exported = await exportReport({ type: 'eq', result });
-    if (!exported.success) Alert.alert('Lỗi', 'Không thể xuất báo cáo.');
+    const currentBalance = await getBalance();
+    if (currentBalance < PDF_COST) {
+      Alert.alert(
+        'Không đủ credit',
+        `Cần ${PDF_COST} credit để xuất PDF.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Nạp credit',
+            onPress: () => navigation.navigate('IAPScreen', { requiredCredits: PDF_COST }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Xác nhận xuất báo cáo',
+      `Dùng ${PDF_COST} credit để xuất PDF?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xuất',
+          onPress: async () => {
+            const spent = await spendCredits(PDF_COST);
+            if (!spent) { Alert.alert('Lỗi', 'Không đủ credit.'); return; }
+            const exported = await exportReport({ type: 'eq', result });
+            await checkAccess();
+            if (!exported.success) {
+              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const { dimensionScores, totalScore, maxTotal, level, percentage } = result;
@@ -56,6 +128,12 @@ export default function EQResultScreen({ route, navigation }) {
         <View style={[styles.header, { backgroundColor: level?.color || COLORS.primary }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backBtnText}>‹</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.balanceBadge}
+            onPress={() => navigation.navigate('IAPScreen', {})}
+          >
+            <Text style={styles.balanceBadgeText}>💎 {balance.toFixed(1)}</Text>
           </TouchableOpacity>
           <Text style={styles.headerEmoji}>{level?.emoji}</Text>
           <Text style={styles.headerLabel}>Chỉ số EQ của bé</Text>
@@ -117,27 +195,30 @@ export default function EQResultScreen({ route, navigation }) {
               <Text style={styles.unlockDesc}>
                 Nhận lời khuyên chi tiết và bài tập EQ hàng ngày phù hợp với từng chiều điểm số
               </Text>
-              <View style={styles.unlockFeatures}>
-                {IAP_PRODUCTS.EQ_RESULT.features.map((f, i) => (
-                  <Text key={i} style={[styles.unlockFeature, { color: level?.color }]}>✓ {f}</Text>
-                ))}
+              <View style={styles.creditCostRow}>
+                <Text style={styles.creditCostLabel}>Chi phí:</Text>
+                <Text style={[styles.creditCostValue, { color: level?.color }]}>💎 {COST} credit</Text>
+                {balance < COST && (
+                  <Text style={styles.creditShort}>
+                    (Cần thêm {(COST - balance).toFixed(1)} credit)
+                  </Text>
+                )}
               </View>
               <Button
-                title={`Mở Khóa - ${IAP_PRODUCTS.EQ_RESULT.price}`}
+                title={`Mở Khóa Ngay - ${COST} Credit`}
                 onPress={handleUnlock}
                 style={[styles.unlockBtn, { backgroundColor: level?.color }]}
               />
               <TouchableOpacity
-                onPress={() => navigation.navigate('IAPScreen', { product: IAP_PRODUCTS.FAMILY_REPORT })}
+                onPress={() => navigation.navigate('IAPScreen', { requiredCredits: COST })}
               >
-                <Text style={[styles.bundleLink, { color: level?.color }]}>
-                  Hoặc mua Gói Family Report - tiết kiệm hơn ›
+                <Text style={[styles.buyCreditsLink, { color: level?.color }]}>
+                  Nạp credit ›
                 </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              {/* Advice per dimension */}
               {Object.values(dimensionScores).map((d) => {
                 const adviceKey = d.percentage >= 60 ? 'high' : 'low';
                 const advice = EQ_ADVICE[d.id]?.[adviceKey];
@@ -164,7 +245,7 @@ export default function EQResultScreen({ route, navigation }) {
               })}
 
               <Button
-                title="📄 Xuất Báo Cáo PDF"
+                title={`📄 Xuất Báo Cáo PDF (${PDF_COST} credit)`}
                 onPress={handleExport}
                 variant="outline"
                 style={styles.exportBtn}
@@ -206,13 +287,19 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   backBtnText: { fontSize: 28, color: COLORS.textInverse, lineHeight: 32 },
+  balanceBadge: {
+    position: 'absolute',
+    top: 52,
+    right: SPACING.md,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+  },
+  balanceBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.textInverse, fontWeight: '700' },
   headerEmoji: { fontSize: 48, marginBottom: SPACING.sm },
   headerLabel: { ...TYPOGRAPHY.bodySmall, color: 'rgba(255,255,255,0.8)', marginBottom: SPACING.sm },
-  scoreCircle: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
+  scoreCircle: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8 },
   scoreNum: { fontSize: 56, fontWeight: '900', color: COLORS.textInverse, lineHeight: 60 },
   scoreMax: { fontSize: 24, color: 'rgba(255,255,255,0.7)', marginBottom: 8 },
   levelName: { fontSize: 22, fontWeight: '700', color: COLORS.textInverse, marginBottom: 4 },
@@ -221,12 +308,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: SPACING.md },
   cardTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
   radarContainer: { alignItems: 'center', marginBottom: SPACING.sm },
-  radarLegend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
-  },
+  radarLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendEmoji: { fontSize: 14 },
   legendName: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary },
@@ -248,11 +330,25 @@ const styles = StyleSheet.create({
   },
   unlockEmoji: { fontSize: 40, marginBottom: SPACING.sm },
   unlockTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
-  unlockDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md },
-  unlockFeatures: { alignSelf: 'stretch', marginBottom: SPACING.md },
-  unlockFeature: { ...TYPOGRAPHY.bodySmall, marginBottom: 4, fontWeight: '500' },
+  unlockDesc: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  creditCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  creditCostLabel: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
+  creditCostValue: { fontSize: 18, fontWeight: '800' },
+  creditShort: { ...TYPOGRAPHY.caption, color: COLORS.secondary, width: '100%', textAlign: 'center' },
   unlockBtn: { alignSelf: 'stretch', marginBottom: SPACING.sm },
-  bundleLink: { ...TYPOGRAPHY.bodySmall, textDecorationLine: 'underline' },
+  buyCreditsLink: { ...TYPOGRAPHY.bodySmall, textDecorationLine: 'underline' },
   adviceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.sm },
   adviceDimName: { ...TYPOGRAPHY.h4, flex: 1 },
   levelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.full },

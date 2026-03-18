@@ -9,50 +9,58 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
-import { IAP_PRODUCTS } from '../../data/iapProducts';
-import Button from '../../components/Button';
-import { purchaseProduct, checkPurchase } from '../../utils/iapService';
+import { CREDIT_PACKAGES, CREDIT_COSTS } from '../../data/iapProducts';
+import { purchaseCredits, getBalance } from '../../utils/iapService';
 
 export default function IAPScreen({ route, navigation }) {
-  const { product, onSuccess } = route.params || {};
-  const [purchasing, setPurchasing] = useState(false);
-  const [alreadyPurchased, setAlreadyPurchased] = useState(false);
+  const { onSuccess, requiredCredits } = route.params || {};
+  const [purchasing, setPurchasing] = useState(null); // packageId being purchased
+  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
-    if (product?.id) {
-      checkPurchase(product.id).then(setAlreadyPurchased);
-    }
-  }, [product]);
+    loadBalance();
+  }, []);
 
-  const handlePurchase = async (selectedProduct) => {
-    setPurchasing(true);
+  const loadBalance = async () => {
+    const b = await getBalance();
+    setBalance(b);
+  };
+
+  const handlePurchase = async (pkg) => {
+    setPurchasing(pkg.id);
     try {
-      const result = await purchaseProduct(
-        selectedProduct.id,
-        () => {
-          setPurchasing(false);
-          Alert.alert('Thành công! 🎉', 'Cảm ơn bạn đã mua. Nội dung đã được mở khóa!', [
-            {
-              text: 'Xem ngay',
-              onPress: () => {
-                if (onSuccess) onSuccess();
-                navigation.goBack();
+      await purchaseCredits(
+        pkg.id,
+        pkg.credits,
+        async ({ credits, newBalance }) => {
+          setPurchasing(null);
+          setBalance(newBalance);
+          Alert.alert(
+            'Nạp credit thành công! 💎',
+            `Đã nạp ${credits} credit.\nSố dư hiện tại: ${newBalance} credit`,
+            [
+              {
+                text: 'Tiếp tục',
+                onPress: () => {
+                  if (onSuccess) onSuccess(newBalance);
+                  if (requiredCredits && newBalance >= requiredCredits) {
+                    navigation.goBack();
+                  }
+                },
               },
-            },
-          ]);
+            ]
+          );
         },
-        (err) => {
-          setPurchasing(false);
+        () => {
+          setPurchasing(null);
           Alert.alert('Lỗi', 'Giao dịch không thành công. Vui lòng thử lại.');
         }
       );
     } catch (e) {
-      setPurchasing(false);
+      setPurchasing(null);
       Alert.alert('Lỗi', 'Đã có lỗi xảy ra.');
     }
   };
-
-  const displayProduct = product || IAP_PRODUCTS.FAMILY_REPORT;
 
   return (
     <View style={styles.container}>
@@ -60,81 +68,116 @@ export default function IAPScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mở Khóa Nội Dung</Text>
+        <Text style={styles.headerTitle}>Nạp Credit</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
-        {/* Main Product */}
-        <View style={[styles.productCard, { borderColor: displayProduct.color }]}>
-          {displayProduct.badge && (
-            <View style={[styles.badge, { backgroundColor: COLORS.secondary }]}>
-              <Text style={styles.badgeText}>{displayProduct.badge}</Text>
-            </View>
-          )}
-          <Text style={styles.productEmoji}>{displayProduct.icon}</Text>
-          <Text style={styles.productName}>{displayProduct.name}</Text>
-          <Text style={styles.productDesc}>{displayProduct.description}</Text>
-          <View style={styles.priceRow}>
-            <Text style={[styles.price, { color: displayProduct.color }]}>{displayProduct.price}</Text>
-            <Text style={styles.priceSub}>một lần</Text>
+        {/* Balance Card */}
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>Số dư của bạn</Text>
+          <View style={styles.balanceRow}>
+            <Text style={styles.balanceIcon}>💎</Text>
+            <Text style={styles.balanceNum}>{balance.toFixed(1)}</Text>
+            <Text style={styles.balanceUnit}>credit</Text>
           </View>
-          <View style={styles.featuresList}>
-            {displayProduct.features.map((f, i) => (
-              <View key={i} style={styles.featureItem}>
-                <Text style={[styles.featureCheck, { color: displayProduct.color }]}>✓</Text>
-                <Text style={styles.featureText}>{f}</Text>
-              </View>
-            ))}
-          </View>
-
-          {alreadyPurchased ? (
-            <View style={[styles.purchasedBtn, { backgroundColor: COLORS.successLight }]}>
-              <Text style={[styles.purchasedBtnText, { color: COLORS.success }]}>✓ Đã mua</Text>
+          {requiredCredits && balance < requiredCredits && (
+            <View style={styles.alertBadge}>
+              <Text style={styles.alertText}>
+                Cần thêm {(requiredCredits - balance).toFixed(1)} credit để mở khóa
+              </Text>
             </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.buyBtn, { backgroundColor: displayProduct.color }]}
-              onPress={() => handlePurchase(displayProduct)}
-              disabled={purchasing}
-              activeOpacity={0.85}
-            >
-              {purchasing ? (
-                <ActivityIndicator color={COLORS.textInverse} />
-              ) : (
-                <Text style={styles.buyBtnText}>Mua ngay - {displayProduct.price}</Text>
-              )}
-            </TouchableOpacity>
           )}
         </View>
 
-        {/* Other Products */}
-        <Text style={styles.otherTitle}>Sản Phẩm Khác</Text>
-        {Object.values(IAP_PRODUCTS)
-          .filter((p) => p.id !== displayProduct.id)
-          .map((p) => (
-            <TouchableOpacity
-              key={p.id}
-              style={styles.otherCard}
-              onPress={() => navigation.replace('IAPScreen', { product: p, onSuccess })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.otherIcon, { backgroundColor: p.color + '22' }]}>
-                <Text style={styles.otherIconText}>{p.icon}</Text>
-              </View>
-              <View style={styles.otherInfo}>
-                <Text style={styles.otherName}>{p.name}</Text>
-                <Text style={styles.otherDesc} numberOfLines={1}>{p.description}</Text>
-              </View>
-              <Text style={[styles.otherPrice, { color: p.color }]}>{p.price}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* Credit Usage Guide */}
+        <View style={styles.guideCard}>
+          <Text style={styles.guideTitle}>💡 Credit dùng để làm gì?</Text>
+          <View style={styles.guideList}>
+            <View style={styles.guideItem}>
+              <Text style={styles.guideEmoji}>🧠</Text>
+              <Text style={styles.guideText}>Xem kết quả Phong Cách Nuôi Dạy</Text>
+              <Text style={styles.guideCost}>{CREDIT_COSTS.PARENTING_RESULT} credit</Text>
+            </View>
+            <View style={styles.guideItem}>
+              <Text style={styles.guideEmoji}>🌟</Text>
+              <Text style={styles.guideText}>Xem kết quả Tính Cách Con</Text>
+              <Text style={styles.guideCost}>{CREDIT_COSTS.PERSONALITY_RESULT} credit</Text>
+            </View>
+            <View style={styles.guideItem}>
+              <Text style={styles.guideEmoji}>💝</Text>
+              <Text style={styles.guideText}>Xem kết quả Chỉ Số EQ</Text>
+              <Text style={styles.guideCost}>{CREDIT_COSTS.EQ_RESULT} credit</Text>
+            </View>
+            <View style={[styles.guideItem, styles.guideItemHighlight]}>
+              <Text style={styles.guideEmoji}>👨‍👩‍👧‍👦</Text>
+              <Text style={[styles.guideText, { fontWeight: '600' }]}>Báo Cáo Gia Đình</Text>
+              <Text style={[styles.guideCost, { color: COLORS.secondary }]}>
+                {CREDIT_COSTS.FAMILY_REPORT} credit
+              </Text>
+            </View>
+            <View style={styles.guideItem}>
+              <Text style={styles.guideEmoji}>📄</Text>
+              <Text style={styles.guideText}>Xuất báo cáo PDF</Text>
+              <Text style={styles.guideCost}>{CREDIT_COSTS.EXPORT_PDF} credit</Text>
+            </View>
+          </View>
+        </View>
 
+        {/* Credit Packages */}
+        <Text style={styles.sectionTitle}>Chọn Gói Credit</Text>
+
+        {CREDIT_PACKAGES.map((pkg) => (
+          <TouchableOpacity
+            key={pkg.id}
+            style={[
+              styles.packageCard,
+              pkg.badge === 'PHỔ BIẾN' && styles.packageCardPopular,
+              pkg.badge === 'GIÁ TỐT NHẤT' && styles.packageCardBest,
+            ]}
+            onPress={() => handlePurchase(pkg)}
+            disabled={!!purchasing}
+            activeOpacity={0.85}
+          >
+            {pkg.badge && (
+              <View
+                style={[
+                  styles.packageBadge,
+                  { backgroundColor: pkg.badge === 'GIÁ TỐT NHẤT' ? COLORS.warning : COLORS.secondary },
+                ]}
+              >
+                <Text style={styles.packageBadgeText}>{pkg.badge}</Text>
+              </View>
+            )}
+            <View style={styles.packageLeft}>
+              <View style={[styles.packageIconBg, { backgroundColor: pkg.color + '22' }]}>
+                <Text style={styles.packageIcon}>💎</Text>
+              </View>
+              <View style={styles.packageInfo}>
+                <Text style={[styles.packageCredits, { color: pkg.color }]}>
+                  {pkg.credits} Credit{pkg.credits > 1 ? 's' : ''}
+                </Text>
+                <Text style={styles.packageId}>{pkg.id}</Text>
+              </View>
+            </View>
+            <View style={styles.packageRight}>
+              {purchasing === pkg.id ? (
+                <ActivityIndicator size="small" color={pkg.color} />
+              ) : (
+                <View style={[styles.priceBtn, { backgroundColor: pkg.color }]}>
+                  <Text style={styles.priceBtnText}>{pkg.price}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        {/* Legal */}
         <View style={styles.legalSection}>
           <Text style={styles.legalText}>
-            • Thanh toán một lần, không tự động gia hạn{'\n'}
-            • Kết quả được lưu trên thiết bị của bạn{'\n'}
-            • Không cần kết nối internet sau khi mua
+            • Credit không hết hạn, dùng bất kỳ lúc nào{'\n'}
+            • Thanh toán an toàn qua App Store / Google Play{'\n'}
+            • Không hoàn tiền sau khi credit đã được sử dụng
           </Text>
           <TouchableOpacity>
             <Text style={styles.restoreText}>Khôi phục giao dịch</Text>
@@ -170,80 +213,102 @@ const styles = StyleSheet.create({
   closeBtnText: { fontSize: 16, color: COLORS.textSecondary },
   headerTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, flex: 1, textAlign: 'center' },
   content: { flex: 1, padding: SPACING.lg },
-  productCard: {
-    backgroundColor: COLORS.surface,
+  balanceCard: {
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
-    borderWidth: 2,
     alignItems: 'center',
-    marginBottom: SPACING.lg,
-    ...SHADOWS.lg,
-    position: 'relative',
-    overflow: 'visible',
-  },
-  badge: {
-    position: 'absolute',
-    top: -12,
-    right: SPACING.md,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-  },
-  badgeText: { ...TYPOGRAPHY.caption, color: COLORS.textInverse, fontWeight: '800' },
-  productEmoji: { fontSize: 56, marginBottom: SPACING.sm },
-  productName: { ...TYPOGRAPHY.h3, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
-  productDesc: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
     marginBottom: SPACING.md,
+    ...SHADOWS.lg,
   },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: SPACING.md },
-  price: { fontSize: 32, fontWeight: '800' },
-  priceSub: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
-  featuresList: { alignSelf: 'stretch', marginBottom: SPACING.lg },
-  featureItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  featureCheck: { fontWeight: '700', fontSize: 16 },
-  featureText: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1, lineHeight: 22 },
-  buyBtn: {
-    alignSelf: 'stretch',
-    paddingVertical: 16,
+  balanceLabel: { ...TYPOGRAPHY.bodySmall, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  balanceIcon: { fontSize: 32 },
+  balanceNum: { fontSize: 48, fontWeight: '900', color: COLORS.textInverse },
+  balanceUnit: { ...TYPOGRAPHY.body, color: 'rgba(255,255,255,0.8)', marginTop: 12 },
+  alertBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    marginTop: SPACING.sm,
+  },
+  alertText: { ...TYPOGRAPHY.caption, color: COLORS.textInverse, textAlign: 'center' },
+  guideCard: {
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    ...SHADOWS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
   },
-  buyBtnText: { ...TYPOGRAPHY.button, color: COLORS.textInverse },
-  purchasedBtn: {
-    alignSelf: 'stretch',
-    paddingVertical: 16,
-    borderRadius: RADIUS.lg,
+  guideTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
+  guideList: { gap: 8 },
+  guideItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  purchasedBtnText: { ...TYPOGRAPHY.button },
-  otherTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
-  otherCard: {
+  guideItemHighlight: {
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0,
+    marginVertical: 2,
+  },
+  guideEmoji: { fontSize: 18, width: 26 },
+  guideText: { ...TYPOGRAPHY.bodySmall, color: COLORS.text, flex: 1 },
+  guideCost: { ...TYPOGRAPHY.bodySmall, color: COLORS.primary, fontWeight: '700' },
+  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
+  packageCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
     marginBottom: SPACING.sm,
     ...SHADOWS.sm,
+    position: 'relative',
+    overflow: 'visible',
   },
-  otherIcon: {
+  packageCardPopular: {
+    borderWidth: 2,
+    borderColor: COLORS.secondary,
+  },
+  packageCardBest: {
+    borderWidth: 2,
+    borderColor: COLORS.warning,
+  },
+  packageBadge: {
+    position: 'absolute',
+    top: -10,
+    right: SPACING.md,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+  },
+  packageBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.textInverse, fontWeight: '800' },
+  packageLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, flex: 1 },
+  packageIconBg: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  otherIconText: { fontSize: 22 },
-  otherInfo: { flex: 1 },
-  otherName: { ...TYPOGRAPHY.bodySmall, color: COLORS.text, fontWeight: '600' },
-  otherDesc: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },
-  otherPrice: { ...TYPOGRAPHY.bodySmall, fontWeight: '700' },
+  packageIcon: { fontSize: 22 },
+  packageInfo: { flex: 1 },
+  packageCredits: { fontSize: 18, fontWeight: '800' },
+  packageId: { ...TYPOGRAPHY.caption, color: COLORS.textMuted, marginTop: 2 },
+  packageRight: { alignItems: 'flex-end' },
+  priceBtn: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: RADIUS.full,
+  },
+  priceBtnText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
   legalSection: {
     backgroundColor: COLORS.borderLight,
     borderRadius: RADIUS.lg,

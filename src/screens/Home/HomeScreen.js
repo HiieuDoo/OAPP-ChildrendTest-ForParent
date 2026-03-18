@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
-import { getCompletedTests } from '../../utils/storage';
+import { getCompletedTests, getCredits } from '../../utils/storage';
 
 const TEST_CARDS = [
   {
@@ -50,10 +50,12 @@ const TEST_CARDS = [
 export default function HomeScreen({ navigation }) {
   const [completedTests, setCompletedTests] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+  const [credits, setCredits] = useState(0);
 
   const loadData = async () => {
-    const completed = await getCompletedTests();
+    const [completed, bal] = await Promise.all([getCompletedTests(), getCredits()]);
     setCompletedTests(completed);
+    setCredits(bal);
   };
 
   useEffect(() => {
@@ -77,10 +79,18 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.greeting}>Xin chào, Phụ huynh! 👋</Text>
-            <Text style={styles.headerTitle}>Hiểu Con Hơn</Text>
+            <View style={styles.headerTopRow}>
+              <Text style={styles.greeting}>Xin chào, Phụ huynh! 👋</Text>
+              <TouchableOpacity
+                style={styles.creditBadge}
+                onPress={() => navigation.navigate('IAPScreen', {})}
+              >
+                <Text style={styles.creditBadgeText}>💎 {credits.toFixed(1)}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.headerTitle}>Mindful Guardian</Text>
             <Text style={styles.headerSubtitle}>
-              Các bài test giúp bạn hiểu con và nâng cao kỹ năng nuôi dạy
+              Hiểu sâu tâm lý gia đình qua các bài đánh giá khoa học
             </Text>
           </View>
           <View style={styles.statsRow}>
@@ -201,10 +211,26 @@ const styles = StyleSheet.create({
   headerContent: {
     marginBottom: SPACING.lg,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  creditBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+  },
+  creditBadgeText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.textInverse,
+    fontWeight: '700',
+  },
   greeting: {
     ...TYPOGRAPHY.bodySmall,
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
   },
   headerTitle: {
     fontSize: 32,
