@@ -36,11 +36,11 @@ export default function IAPScreen({ route, navigation }) {
           setPurchasing(null);
           setBalance(newBalance);
           Alert.alert(
-            'Nạp credit thành công! 💎',
-            `Đã nạp ${credits} credit.\nSố dư hiện tại: ${newBalance} credit`,
+            'Credits added! 💎',
+            `Added ${credits} credits.\nNew balance: ${newBalance} credits`,
             [
               {
-                text: 'Tiếp tục',
+                text: 'Continue',
                 onPress: () => {
                   if (onSuccess) onSuccess(newBalance);
                   if (requiredCredits && newBalance >= requiredCredits) {
@@ -53,12 +53,12 @@ export default function IAPScreen({ route, navigation }) {
         },
         () => {
           setPurchasing(null);
-          Alert.alert('Lỗi', 'Giao dịch không thành công. Vui lòng thử lại.');
+          Alert.alert('Error', 'Transaction failed. Please try again.');
         }
       );
     } catch (e) {
       setPurchasing(null);
-      Alert.alert('Lỗi', 'Đã có lỗi xảy ra.');
+      Alert.alert('Error', 'Something went wrong.');
     }
   };
 
@@ -68,14 +68,14 @@ export default function IAPScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nạp Credit</Text>
+        <Text style={styles.headerTitle}>Buy Credits</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
         {/* Balance Card */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Số dư của bạn</Text>
+          <Text style={styles.balanceLabel}>Your balance</Text>
           <View style={styles.balanceRow}>
             <Text style={styles.balanceIcon}>💎</Text>
             <Text style={styles.balanceNum}>{balance.toFixed(1)}</Text>
@@ -84,7 +84,7 @@ export default function IAPScreen({ route, navigation }) {
           {requiredCredits && balance < requiredCredits && (
             <View style={styles.alertBadge}>
               <Text style={styles.alertText}>
-                Cần thêm {(requiredCredits - balance).toFixed(1)} credit để mở khóa
+                Need {(requiredCredits - balance).toFixed(1)} more credits to unlock
               </Text>
             </View>
           )}
@@ -92,48 +92,48 @@ export default function IAPScreen({ route, navigation }) {
 
         {/* Credit Usage Guide */}
         <View style={styles.guideCard}>
-          <Text style={styles.guideTitle}>💡 Credit dùng để làm gì?</Text>
+          <Text style={styles.guideTitle}>💡 What are credits used for?</Text>
           <View style={styles.guideList}>
             <View style={styles.guideItem}>
               <Text style={styles.guideEmoji}>🧠</Text>
-              <Text style={styles.guideText}>Xem kết quả Phong Cách Nuôi Dạy</Text>
+              <Text style={styles.guideText}>View Parenting Style result</Text>
               <Text style={styles.guideCost}>{CREDIT_COSTS.PARENTING_RESULT} credit</Text>
             </View>
             <View style={styles.guideItem}>
               <Text style={styles.guideEmoji}>🌟</Text>
-              <Text style={styles.guideText}>Xem kết quả Tính Cách Con</Text>
+              <Text style={styles.guideText}>View Child Personality result</Text>
               <Text style={styles.guideCost}>{CREDIT_COSTS.PERSONALITY_RESULT} credit</Text>
             </View>
             <View style={styles.guideItem}>
               <Text style={styles.guideEmoji}>💝</Text>
-              <Text style={styles.guideText}>Xem kết quả Chỉ Số EQ</Text>
+              <Text style={styles.guideText}>View EQ Score result</Text>
               <Text style={styles.guideCost}>{CREDIT_COSTS.EQ_RESULT} credit</Text>
             </View>
             <View style={[styles.guideItem, styles.guideItemHighlight]}>
               <Text style={styles.guideEmoji}>👨‍👩‍👧‍👦</Text>
-              <Text style={[styles.guideText, { fontWeight: '600' }]}>Báo Cáo Gia Đình</Text>
+              <Text style={[styles.guideText, { fontWeight: '600' }]}>Family Report</Text>
               <Text style={[styles.guideCost, { color: COLORS.secondary }]}>
-                {CREDIT_COSTS.FAMILY_REPORT} credit
+                {CREDIT_COSTS.FAMILY_REPORT} credits
               </Text>
             </View>
             <View style={styles.guideItem}>
               <Text style={styles.guideEmoji}>📄</Text>
-              <Text style={styles.guideText}>Xuất báo cáo PDF</Text>
+              <Text style={styles.guideText}>Export PDF report</Text>
               <Text style={styles.guideCost}>{CREDIT_COSTS.EXPORT_PDF} credit</Text>
             </View>
           </View>
         </View>
 
         {/* Credit Packages */}
-        <Text style={styles.sectionTitle}>Chọn Gói Credit</Text>
+        <Text style={styles.sectionTitle}>Choose a Package</Text>
 
         {CREDIT_PACKAGES.map((pkg) => (
           <TouchableOpacity
             key={pkg.id}
             style={[
               styles.packageCard,
-              pkg.badge === 'PHỔ BIẾN' && styles.packageCardPopular,
-              pkg.badge === 'GIÁ TỐT NHẤT' && styles.packageCardBest,
+              pkg.badge === 'POPULAR' && styles.packageCardPopular,
+              pkg.badge === 'BEST VALUE' && styles.packageCardBest,
             ]}
             onPress={() => handlePurchase(pkg)}
             disabled={!!purchasing}
@@ -143,7 +143,7 @@ export default function IAPScreen({ route, navigation }) {
               <View
                 style={[
                   styles.packageBadge,
-                  { backgroundColor: pkg.badge === 'GIÁ TỐT NHẤT' ? COLORS.warning : COLORS.secondary },
+                  { backgroundColor: pkg.badge === 'BEST VALUE' ? COLORS.warning : COLORS.secondary },
                 ]}
               >
                 <Text style={styles.packageBadgeText}>{pkg.badge}</Text>
@@ -165,7 +165,7 @@ export default function IAPScreen({ route, navigation }) {
                 <ActivityIndicator size="small" color={pkg.color} />
               ) : (
                 <View style={[styles.priceBtn, { backgroundColor: pkg.color }]}>
-                  <Text style={styles.priceBtnText}>{pkg.price}</Text>
+                  <Text style={styles.priceBtnText}>{pkg.priceUSD}</Text>
                 </View>
               )}
             </View>
@@ -175,12 +175,13 @@ export default function IAPScreen({ route, navigation }) {
         {/* Legal */}
         <View style={styles.legalSection}>
           <Text style={styles.legalText}>
-            • Credit không hết hạn, dùng bất kỳ lúc nào{'\n'}
-            • Thanh toán an toàn qua App Store / Google Play{'\n'}
-            • Không hoàn tiền sau khi credit đã được sử dụng
+            • Credits never expire — use anytime{'\n'}
+            • Secure payment via App Store / Google Play{'\n'}
+            • No refunds once credits have been used{'\n'}
+            • $0.20 USD per credit
           </Text>
           <TouchableOpacity>
-            <Text style={styles.restoreText}>Khôi phục giao dịch</Text>
+            <Text style={styles.restoreText}>Restore purchases</Text>
           </TouchableOpacity>
         </View>
 

@@ -39,17 +39,17 @@ export default function ProfileScreen({ navigation }) {
 
   const handleClearData = () => {
     Alert.alert(
-      'Xóa tất cả dữ liệu?',
-      'Tất cả kết quả test, credit và giao dịch sẽ bị xóa. Không thể hoàn tác.',
+      'Delete all data?',
+      'All test results, credits, and transactions will be deleted. This cannot be undone.',
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xóa',
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             await clearAllData();
             loadData();
-            Alert.alert('Đã xóa', 'Tất cả dữ liệu đã được xóa.');
+            Alert.alert('Deleted', 'All data has been cleared.');
           },
         },
       ]
@@ -57,46 +57,46 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const testNames = {
-    parenting: { name: 'Phong Cách Nuôi Dạy', emoji: '🧠', screen: 'ParentingTest' },
-    personality: { name: 'Tính Cách Con', emoji: '🌟', screen: 'PersonalityTest' },
-    eq: { name: 'Chỉ Số EQ', emoji: '💝', screen: 'EQTest' },
+    parenting: { name: 'Parenting Style', emoji: '🧠', screen: 'ParentingTest' },
+    personality: { name: 'Child Personality', emoji: '🌟', screen: 'PersonalityTest' },
+    eq: { name: 'EQ Score', emoji: '💝', screen: 'EQTest' },
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tài Khoản</Text>
+        <Text style={styles.headerTitle}>Account</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <Text style={styles.profileEmoji}>👨‍👩‍👧</Text>
-          <Text style={styles.profileName}>Phụ Huynh {APP_NAME}</Text>
-          <Text style={styles.profileSub}>Đang đồng hành cùng sự phát triển của con</Text>
+          <Text style={styles.profileName}>{APP_NAME} Parent</Text>
+          <Text style={styles.profileSub}>Supporting your child's growth journey</Text>
 
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{Object.keys(completedTests).length}</Text>
-              <Text style={styles.statLabel}>Test hoàn thành</Text>
+              <Text style={styles.statLabel}>Tests Done</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{credits.toFixed(1)}</Text>
-              <Text style={styles.statLabel}>💎 Credit</Text>
+              <Text style={styles.statLabel}>💎 Credits</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{Object.keys(purchases).length}</Text>
-              <Text style={styles.statLabel}>Giao dịch</Text>
+              <Text style={styles.statLabel}>Purchases</Text>
             </View>
           </View>
         </View>
 
         {/* Credit Balance */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Credit Của Bạn</Text>
+          <Text style={styles.sectionTitle}>Your Credits</Text>
           <TouchableOpacity
             style={styles.creditCard}
             onPress={() => navigation.navigate('IAPScreen', {})}
@@ -105,23 +105,23 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.creditLeft}>
               <Text style={styles.creditEmoji}>💎</Text>
               <View>
-                <Text style={styles.creditBalance}>{credits.toFixed(1)} Credit</Text>
-                <Text style={styles.creditSub}>Dùng để xem kết quả & xuất báo cáo</Text>
+                <Text style={styles.creditBalance}>{credits.toFixed(1)} Credits</Text>
+                <Text style={styles.creditSub}>Use to unlock results & export reports</Text>
               </View>
             </View>
             <View style={styles.creditBtn}>
-              <Text style={styles.creditBtnText}>Nạp thêm</Text>
+              <Text style={styles.creditBtnText}>Top Up</Text>
             </View>
           </TouchableOpacity>
         </View>
 
         {/* Completed Tests */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lịch Sử Bài Test</Text>
+          <Text style={styles.sectionTitle}>Test History</Text>
           {Object.keys(completedTests).length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>📝</Text>
-              <Text style={styles.emptyText}>Chưa hoàn thành bài test nào</Text>
+              <Text style={styles.emptyText}>No tests completed yet</Text>
             </View>
           ) : (
             Object.entries(completedTests).map(([testId, date]) => {
@@ -137,7 +137,7 @@ export default function ProfileScreen({ navigation }) {
                   <View style={styles.testItemInfo}>
                     <Text style={styles.testItemName}>{info.name}</Text>
                     <Text style={styles.testItemDate}>
-                      {new Date(date).toLocaleDateString('vi-VN')}
+                      {new Date(date).toLocaleDateString('en-US')}
                     </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
@@ -149,15 +149,15 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Purchases */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lịch Sử Nạp Credit</Text>
+          <Text style={styles.sectionTitle}>Credit History</Text>
           {Object.keys(purchases).length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>💳</Text>
-              <Text style={styles.emptyText}>Chưa có giao dịch nào</Text>
+              <Text style={styles.emptyText}>No purchases yet</Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('IAPScreen', {})}
               >
-                <Text style={styles.shopLink}>Nạp credit ngay ›</Text>
+                <Text style={styles.shopLink}>Buy credits ›</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -167,7 +167,7 @@ export default function ProfileScreen({ navigation }) {
                 <View style={styles.purchaseInfo}>
                   <Text style={styles.purchaseName}>{productId}</Text>
                   <Text style={styles.purchaseDate}>
-                    {new Date(data.purchasedAt).toLocaleDateString('vi-VN')}
+                    {new Date(data.purchasedAt).toLocaleDateString('en-US')}
                   </Text>
                 </View>
               </View>
@@ -177,18 +177,18 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài Đặt</Text>
+          <Text style={styles.sectionTitle}>Settings</Text>
           <TouchableOpacity
             style={styles.settingItem}
             onPress={() => navigation.navigate('IAPScreen', {})}
           >
             <Text style={styles.settingEmoji}>🔄</Text>
-            <Text style={styles.settingText}>Khôi phục giao dịch</Text>
+            <Text style={styles.settingText}>Restore purchases</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.settingItem} onPress={handleClearData}>
             <Text style={styles.settingEmoji}>🗑️</Text>
-            <Text style={[styles.settingText, { color: COLORS.secondary }]}>Xóa tất cả dữ liệu</Text>
+            <Text style={[styles.settingText, { color: COLORS.secondary }]}>Delete all data</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
         </View>
@@ -196,10 +196,10 @@ export default function ProfileScreen({ navigation }) {
         {/* About */}
         <View style={styles.aboutSection}>
           <Text style={styles.appName}>{APP_NAME}</Text>
-          <Text style={styles.version}>Phiên bản 2.0.0</Text>
+          <Text style={styles.version}>Version 2.0.0</Text>
           <Text style={styles.aboutText}>
-            Ứng dụng hỗ trợ phụ huynh hiểu sâu hơn về tâm lý gia đình.{'\n'}
-            Dữ liệu được lưu trên thiết bị của bạn.
+            Helping parents understand their family's psychology better.{'\n'}
+            All data is stored locally on your device.
           </Text>
         </View>
 

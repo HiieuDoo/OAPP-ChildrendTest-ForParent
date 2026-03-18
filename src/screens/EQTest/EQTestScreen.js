@@ -42,9 +42,9 @@ export default function EQTestScreen({ navigation }) {
 
   const handleBack = () => {
     if (currentQ === 0) {
-      Alert.alert('Thoát bài test?', 'Tiến trình sẽ không được lưu.', [
-        { text: 'Tiếp tục', style: 'cancel' },
-        { text: 'Thoát', onPress: () => navigation.goBack() },
+      Alert.alert('Exit test?', 'Progress will not be saved.', [
+        { text: 'Continue', style: 'cancel' },
+        { text: 'Exit', onPress: () => navigation.goBack() },
       ]);
     } else {
       setCurrentQ(currentQ - 1);
@@ -95,7 +95,7 @@ export default function EQTestScreen({ navigation }) {
           <Text style={styles.backBtnText}>‹</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Chỉ Số EQ</Text>
+          <Text style={styles.headerTitle}>EQ Score</Text>
           <Text style={styles.headerSub}>
             {dimension?.emoji} {dimension?.name} · {currentQ + 1}/{EQ_QUESTIONS.length}
           </Text>
@@ -125,7 +125,7 @@ export default function EQTestScreen({ navigation }) {
         <View style={[styles.questionCard, { borderTopColor: dimension?.color || '#FF69B4' }]}>
           <View style={[styles.questionBadge, { backgroundColor: (dimension?.color || '#FF69B4') + '22' }]}>
             <Text style={[styles.questionBadgeText, { color: dimension?.color }]}>
-              Câu {currentQ + 1}
+              Q{currentQ + 1}
             </Text>
           </View>
           <Text style={styles.questionText}>{question.question}</Text>
@@ -160,7 +160,7 @@ export default function EQTestScreen({ navigation }) {
         </View>
 
         <View style={styles.scaleNote}>
-          <Text style={styles.scaleNoteText}>📊 Thang điểm: 1 (Hiếm khi) → 4 (Luôn luôn)</Text>
+          <Text style={styles.scaleNoteText}>📊 Scale: 1 (Rarely) → 4 (Always)</Text>
         </View>
 
         <View style={styles.bottomPad} />
@@ -168,7 +168,7 @@ export default function EQTestScreen({ navigation }) {
 
       <View style={styles.footer}>
         <Button
-          title={isLast ? 'Xem Kết Quả EQ' : 'Tiếp Theo'}
+          title={isLast ? 'View EQ Results' : 'Next'}
           onPress={handleNext}
           disabled={!selected}
           style={{ backgroundColor: '#FF69B4' }}

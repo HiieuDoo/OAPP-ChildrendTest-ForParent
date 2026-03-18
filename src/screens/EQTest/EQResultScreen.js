@@ -38,12 +38,12 @@ export default function EQResultScreen({ route, navigation }) {
   const handleUnlock = async () => {
     if (balance < COST) {
       Alert.alert(
-        'Không đủ credit 💎',
-        `Cần ${COST} credit để xem kết quả.\nSố dư: ${balance.toFixed(1)} credit`,
+        'Not enough credits 💎',
+        `Need ${COST} credits to view result.\nBalance: ${balance.toFixed(1)} credits`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () =>
               navigation.navigate('IAPScreen', {
                 requiredCredits: COST,
@@ -56,18 +56,18 @@ export default function EQResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận mở khóa',
-      `Dùng ${COST} credit để xem kết quả EQ?\nSố dư: ${balance.toFixed(1)} credit`,
+      'Confirm unlock',
+      `Use ${COST} credits to view EQ result?\nBalance: ${balance.toFixed(1)} credits`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xác nhận',
+          text: 'Confirm',
           onPress: async () => {
             const success = await unlockWithCredits('eq', COST);
             if (success) {
               await checkAccess();
             } else {
-              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
             }
           },
         },
@@ -79,12 +79,12 @@ export default function EQResultScreen({ route, navigation }) {
     const currentBalance = await getBalance();
     if (currentBalance < PDF_COST) {
       Alert.alert(
-        'Không đủ credit',
-        `Cần ${PDF_COST} credit để xuất PDF.`,
+        'Not enough credits',
+        `Need ${PDF_COST} credits to export PDF.`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () => navigation.navigate('IAPScreen', { requiredCredits: PDF_COST }),
           },
         ]
@@ -93,19 +93,19 @@ export default function EQResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận xuất báo cáo',
-      `Dùng ${PDF_COST} credit để xuất PDF?`,
+      'Confirm export',
+      `Use ${PDF_COST} credits to export PDF?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xuất',
+          text: 'Export',
           onPress: async () => {
             const spent = await spendCredits(PDF_COST);
-            if (!spent) { Alert.alert('Lỗi', 'Không đủ credit.'); return; }
+            if (!spent) { Alert.alert('Error', 'Not enough credits.'); return; }
             const exported = await exportReport({ type: 'eq', result });
             await checkAccess();
             if (!exported.success) {
-              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo. Vui lòng thử lại.');
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
             }
           },
         },
@@ -136,19 +136,19 @@ export default function EQResultScreen({ route, navigation }) {
             <Text style={styles.balanceBadgeText}>💎 {balance.toFixed(1)}</Text>
           </TouchableOpacity>
           <Text style={styles.headerEmoji}>{level?.emoji}</Text>
-          <Text style={styles.headerLabel}>Chỉ số EQ của bé</Text>
+          <Text style={styles.headerLabel}>Your child's EQ score</Text>
           <View style={styles.scoreCircle}>
             <Text style={styles.scoreNum}>{totalScore}</Text>
             <Text style={styles.scoreMax}>/{maxTotal}</Text>
           </View>
           <Text style={styles.levelName}>{level?.level}</Text>
-          <Text style={styles.percentageText}>{percentage}% điểm tối đa</Text>
+          <Text style={styles.percentageText}>{percentage}% of maximum</Text>
         </View>
 
         <View style={styles.content}>
           {/* Radar Chart */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Biểu Đồ EQ</Text>
+            <Text style={styles.cardTitle}>EQ Chart</Text>
             <View style={styles.radarContainer}>
               <ScoreRadar scores={radarScores} size={220} />
             </View>
@@ -164,7 +164,7 @@ export default function EQResultScreen({ route, navigation }) {
 
           {/* Dimension Scores */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Chi Tiết Từng Chiều</Text>
+            <Text style={styles.cardTitle}>Dimension Details</Text>
             {Object.values(dimensionScores).map((d) => (
               <View key={d.id} style={styles.dimRow}>
                 <View style={styles.dimHeader}>
@@ -191,21 +191,21 @@ export default function EQResultScreen({ route, navigation }) {
           {!hasAccess ? (
             <View style={styles.unlockCard}>
               <Text style={styles.unlockEmoji}>🔒</Text>
-              <Text style={styles.unlockTitle}>Mở Khóa Kế Hoạch Phát Triển EQ</Text>
+              <Text style={styles.unlockTitle}>Unlock EQ Development Plan</Text>
               <Text style={styles.unlockDesc}>
-                Nhận lời khuyên chi tiết và bài tập EQ hàng ngày phù hợp với từng chiều điểm số
+                Get detailed advice and daily EQ exercises tailored to each score dimension
               </Text>
               <View style={styles.creditCostRow}>
-                <Text style={styles.creditCostLabel}>Chi phí:</Text>
+                <Text style={styles.creditCostLabel}>Cost:</Text>
                 <Text style={[styles.creditCostValue, { color: level?.color }]}>💎 {COST} credit</Text>
                 {balance < COST && (
                   <Text style={styles.creditShort}>
-                    (Cần thêm {(COST - balance).toFixed(1)} credit)
+                    (Need {(COST - balance).toFixed(1)} more credits)
                   </Text>
                 )}
               </View>
               <Button
-                title={`Mở Khóa Ngay - ${COST} Credit`}
+                title={`Unlock Now — ${COST} Credit`}
                 onPress={handleUnlock}
                 style={[styles.unlockBtn, { backgroundColor: level?.color }]}
               />
@@ -213,7 +213,7 @@ export default function EQResultScreen({ route, navigation }) {
                 onPress={() => navigation.navigate('IAPScreen', { requiredCredits: COST })}
               >
                 <Text style={[styles.buyCreditsLink, { color: level?.color }]}>
-                  Nạp credit ›
+                  Buy credits ›
                 </Text>
               </TouchableOpacity>
             </View>
@@ -230,7 +230,7 @@ export default function EQResultScreen({ route, navigation }) {
                       <Text style={[styles.adviceDimName, { color: d.color }]}>{d.name}</Text>
                       <View style={[styles.levelBadge, { backgroundColor: d.color + '22' }]}>
                         <Text style={[styles.levelBadgeText, { color: d.color }]}>
-                          {d.percentage >= 60 ? 'Tốt' : 'Cần cải thiện'}
+                          {d.percentage >= 60 ? 'Good' : 'Needs improvement'}
                         </Text>
                       </View>
                     </View>
@@ -245,7 +245,7 @@ export default function EQResultScreen({ route, navigation }) {
               })}
 
               <Button
-                title={`📄 Xuất Báo Cáo PDF (${PDF_COST} credit)`}
+                title={`📄 Export PDF Report (${PDF_COST} credit)`}
                 onPress={handleExport}
                 variant="outline"
                 style={styles.exportBtn}
@@ -254,7 +254,7 @@ export default function EQResultScreen({ route, navigation }) {
           )}
 
           <Button
-            title="Làm lại bài test EQ"
+            title="Retake EQ test"
             onPress={() => navigation.replace('EQTest')}
             variant="ghost"
           />

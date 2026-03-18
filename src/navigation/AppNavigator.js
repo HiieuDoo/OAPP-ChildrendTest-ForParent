@@ -20,7 +20,7 @@ import ProfileScreen from '../screens/Profile/ProfileScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ emoji, label, focused }) {
+function TabIcon({ emoji, focused }) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ fontSize: focused ? 24 : 20 }}>{emoji}</Text>
@@ -37,9 +37,9 @@ function HomeTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          paddingBottom: 8,
+          paddingBottom: 16,
           paddingTop: 8,
-          height: 68,
+          height: 76,
         },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
@@ -50,7 +50,7 @@ function HomeTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Trang Chủ',
+          tabBarLabel: 'Home',
           tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
         }}
       />
@@ -63,10 +63,18 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
+        name="Shop"
+        component={IAPScreen}
+        options={{
+          tabBarLabel: 'Shop',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="💎" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Tài Khoản',
+          tabBarLabel: 'Account',
           tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
         }}
       />

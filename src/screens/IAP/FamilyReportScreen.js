@@ -56,12 +56,12 @@ export default function FamilyReportScreen({ navigation }) {
   const handleUnlock = async () => {
     if (balance < FAMILY_COST) {
       Alert.alert(
-        'Không đủ credit 💎',
-        `Bạn cần ${FAMILY_COST} credit để xem báo cáo gia đình.\nSố dư: ${balance.toFixed(1)} credit`,
+        'Not enough credits 💎',
+        `You need ${FAMILY_COST} credits to view the family report.\nBalance: ${balance.toFixed(1)} credits`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () =>
               navigation.navigate('IAPScreen', {
                 requiredCredits: FAMILY_COST,
@@ -74,20 +74,20 @@ export default function FamilyReportScreen({ navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận mở khóa',
-      `Sử dụng ${FAMILY_COST} credit để xem Báo Cáo Gia Đình?\nSố dư: ${balance.toFixed(1)} credit`,
+      'Confirm unlock',
+      `Use ${FAMILY_COST} credits to view the Family Report?\nBalance: ${balance.toFixed(1)} credits`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xác nhận',
+          text: 'Confirm',
           onPress: async () => {
             setUnlocking(true);
             const success = await unlockWithCredits('family', FAMILY_COST);
             if (success) {
               await loadData();
-              Alert.alert('Đã mở khóa! 🎉', 'Báo cáo gia đình đã được kích hoạt!');
+              Alert.alert('Unlocked! 🎉', 'Family report is now active!');
             } else {
-              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
             }
             setUnlocking(false);
           },
@@ -99,12 +99,12 @@ export default function FamilyReportScreen({ navigation }) {
   const handleExportFamily = async () => {
     if (balance < CREDIT_COSTS.EXPORT_PDF) {
       Alert.alert(
-        'Không đủ credit',
-        `Cần ${CREDIT_COSTS.EXPORT_PDF} credit để xuất PDF.`,
+        'Not enough credits',
+        `Need ${CREDIT_COSTS.EXPORT_PDF} credits to export PDF.`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () => navigation.navigate('IAPScreen', { requiredCredits: CREDIT_COSTS.EXPORT_PDF }),
           },
         ]
@@ -113,18 +113,18 @@ export default function FamilyReportScreen({ navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận xuất báo cáo',
-      `Sử dụng ${CREDIT_COSTS.EXPORT_PDF} credit để xuất PDF?`,
+      'Confirm export',
+      `Use ${CREDIT_COSTS.EXPORT_PDF} credits to export PDF?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xuất',
+          text: 'Export',
           onPress: async () => {
             setExporting(true);
             const { spendCredits } = await import('../../utils/storage');
             const spent = await spendCredits(CREDIT_COSTS.EXPORT_PDF);
             if (!spent) {
-              Alert.alert('Lỗi', 'Không thể trừ credit.');
+              Alert.alert('Error', 'Unable to deduct credits.');
               setExporting(false);
               return;
             }
@@ -132,7 +132,7 @@ export default function FamilyReportScreen({ navigation }) {
             setExporting(false);
             await loadData();
             if (!exported.success) {
-              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo.');
+              Alert.alert('Export failed', exported.error || 'Unable to export report.');
             }
           },
         },
@@ -153,7 +153,7 @@ export default function FamilyReportScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Báo Cáo Gia Đình</Text>
+        <Text style={styles.headerTitle}>Family Report</Text>
         <TouchableOpacity
           style={styles.creditBadge}
           onPress={() => navigation.navigate('IAPScreen', {})}
@@ -166,13 +166,13 @@ export default function FamilyReportScreen({ navigation }) {
         {/* Banner */}
         <View style={styles.banner}>
           <Text style={styles.bannerEmoji}>👨‍👩‍👧‍👦</Text>
-          <Text style={styles.bannerTitle}>Báo Cáo Gia Đình Toàn Diện</Text>
+          <Text style={styles.bannerTitle}>Complete Family Report</Text>
           <Text style={styles.bannerDesc}>
-            Tổng hợp phân tích từ cả 3 bài test để hiểu sâu hơn về gia đình bạn
+            Combined analysis from all 3 tests for a deeper understanding of your family
           </Text>
           {hasAccess ? (
             <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>✓ Đã kích hoạt</Text>
+              <Text style={styles.activeBadgeText}>✓ Activated</Text>
             </View>
           ) : (
             <View style={styles.costBadge}>
@@ -182,12 +182,12 @@ export default function FamilyReportScreen({ navigation }) {
         </View>
 
         {/* Test Progress */}
-        <Text style={styles.sectionTitle}>Tiến Trình Bài Test ({completedCount}/3)</Text>
+        <Text style={styles.sectionTitle}>Test Progress ({completedCount}/3)</Text>
 
         {[
-          { key: 'parenting', name: 'Phong Cách Nuôi Dạy', emoji: '🧠', color: COLORS.primary, screen: 'ParentingTest' },
-          { key: 'personality', name: 'Tính Cách Con', emoji: '🌟', color: '#FF6B35', screen: 'PersonalityTest' },
-          { key: 'eq', name: 'Chỉ Số EQ', emoji: '💝', color: '#FF69B4', screen: 'EQTest' },
+          { key: 'parenting', name: 'Parenting Style', emoji: '🧠', color: COLORS.primary, screen: 'ParentingTest' },
+          { key: 'personality', name: 'Child Personality', emoji: '🌟', color: '#FF6B35', screen: 'PersonalityTest' },
+          { key: 'eq', name: 'EQ Score', emoji: '💝', color: '#FF69B4', screen: 'EQTest' },
         ].map((test) => {
           const hasResult = !!results[test.key];
           return (
@@ -203,12 +203,12 @@ export default function FamilyReportScreen({ navigation }) {
               <View style={styles.testStatusInfo}>
                 <Text style={styles.testStatusName}>{test.name}</Text>
                 <Text style={[styles.testStatusState, { color: hasResult ? COLORS.success : COLORS.textSecondary }]}>
-                  {hasResult ? '✓ Đã hoàn thành' : '○ Chưa làm'}
+                  {hasResult ? '✓ Completed' : '○ Not done'}
                 </Text>
               </View>
               {!hasResult && (
                 <View style={[styles.doBtn, { backgroundColor: test.color }]}>
-                  <Text style={styles.doBtnText}>Làm</Text>
+                  <Text style={styles.doBtnText}>Start</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -218,12 +218,12 @@ export default function FamilyReportScreen({ navigation }) {
         {/* Content */}
         {hasAccess ? (
           <>
-            <Text style={styles.sectionTitle}>Báo Cáo Gia Đình</Text>
+            <Text style={styles.sectionTitle}>Family Report</Text>
 
             {results.parenting && (
               <View style={[styles.resultCard, { borderLeftColor: COLORS.primary }]}>
                 <Text style={styles.resultCardTitle}>
-                  🧠 Phong cách: {results.parenting.result?.primaryStyle?.name}
+                  🧠 Style: {results.parenting.result?.primaryStyle?.name}
                 </Text>
                 <Text style={styles.resultCardDesc}>
                   {results.parenting.result?.primaryStyle?.description}
@@ -234,7 +234,7 @@ export default function FamilyReportScreen({ navigation }) {
             {results.personality && (
               <View style={[styles.resultCard, { borderLeftColor: '#FF6B35' }]}>
                 <Text style={styles.resultCardTitle}>
-                  🌟 Tính cách bé: {results.personality.result?.primaryType?.name}
+                  🌟 Child personality: {results.personality.result?.primaryType?.name}
                 </Text>
                 <Text style={styles.resultCardDesc}>
                   {results.personality.result?.primaryType?.description}
@@ -248,28 +248,27 @@ export default function FamilyReportScreen({ navigation }) {
                   💝 EQ: {results.eq.result?.level?.level} ({results.eq.result?.totalScore}/{results.eq.result?.maxTotal})
                 </Text>
                 <Text style={styles.resultCardDesc}>
-                  Mức độ trí tuệ cảm xúc: {results.eq.result?.percentage}% điểm tối đa
+                  Emotional intelligence level: {results.eq.result?.percentage}% of maximum
                 </Text>
               </View>
             )}
 
             {completedCount === 3 && (
               <View style={styles.insightCard}>
-                <Text style={styles.insightTitle}>🔍 Phân Tích Gia Đình</Text>
+                <Text style={styles.insightTitle}>🔍 Family Insight</Text>
                 <Text style={styles.insightText}>
-                  Dựa trên kết quả 3 bài test, bạn có phong cách nuôi dạy{' '}
-                  <Text style={styles.bold}>{results.parenting?.result?.primaryStyle?.name}</Text> - phù hợp
-                  với tính cách{' '}
-                  <Text style={styles.bold}>{results.personality?.result?.primaryType?.name}</Text> của bé.
-                  Chỉ số EQ ở mức{' '}
-                  <Text style={styles.bold}>{results.eq?.result?.level?.level}</Text> cho thấy bé đang
-                  phát triển trí tuệ cảm xúc tốt.
+                  Based on all 3 tests, your parenting style is{' '}
+                  <Text style={styles.bold}>{results.parenting?.result?.primaryStyle?.name}</Text> — well matched
+                  with your child's{' '}
+                  <Text style={styles.bold}>{results.personality?.result?.primaryType?.name}</Text> personality.
+                  Their EQ level of{' '}
+                  <Text style={styles.bold}>{results.eq?.result?.level?.level}</Text> shows healthy emotional development.
                 </Text>
               </View>
             )}
 
             <Button
-              title={exporting ? 'Đang xuất...' : `📄 Xuất PDF (${CREDIT_COSTS.EXPORT_PDF} credit)`}
+              title={exporting ? 'Exporting...' : `📄 Export PDF (${CREDIT_COSTS.EXPORT_PDF} credit)`}
               onPress={handleExportFamily}
               style={styles.exportBtn}
               disabled={exporting}
@@ -278,16 +277,16 @@ export default function FamilyReportScreen({ navigation }) {
         ) : (
           <View style={styles.lockedCard}>
             <Text style={styles.lockEmoji}>🔒</Text>
-            <Text style={styles.lockTitle}>Mở Khóa Báo Cáo Gia Đình</Text>
+            <Text style={styles.lockTitle}>Unlock Family Report</Text>
             <Text style={styles.lockDesc}>
-              Tốn {FAMILY_COST} credit để xem toàn bộ phân tích gia đình kết hợp từ 3 bài test
+              Use {FAMILY_COST} credits to view the complete combined analysis from all 3 tests
             </Text>
             <View style={styles.lockFeatures}>
               {[
-                'Tất cả kết quả 3 bài test',
-                'Phân tích tương hợp phụ huynh - con',
-                'Lời khuyên giao tiếp gia đình',
-                'Xuất PDF báo cáo đầy đủ',
+                'All 3 test results',
+                'Parent-child compatibility analysis',
+                'Family communication tips',
+                'Full PDF report export',
               ].map((f, i) => (
                 <View key={i} style={styles.lockFeatureItem}>
                   <Text style={styles.lockFeatureCheck}>✓</Text>
@@ -296,16 +295,16 @@ export default function FamilyReportScreen({ navigation }) {
               ))}
             </View>
             <View style={styles.costRow}>
-              <Text style={styles.costLabel}>Chi phí:</Text>
-              <Text style={styles.costValue}>💎 {FAMILY_COST} credit</Text>
+              <Text style={styles.costLabel}>Cost:</Text>
+              <Text style={styles.costValue}>💎 {FAMILY_COST} credits</Text>
               {balance < FAMILY_COST && (
                 <Text style={styles.costShort}>
-                  (Thiếu {(FAMILY_COST - balance).toFixed(1)} credit)
+                  (Need {(FAMILY_COST - balance).toFixed(1)} more credits)
                 </Text>
               )}
             </View>
             <Button
-              title={unlocking ? 'Đang mở khóa...' : `Mở Khóa Ngay - ${FAMILY_COST} Credit`}
+              title={unlocking ? 'Unlocking...' : `Unlock Now — ${FAMILY_COST} Credits`}
               onPress={handleUnlock}
               disabled={unlocking}
               style={{ backgroundColor: '#4ECDC4' }}
@@ -314,7 +313,7 @@ export default function FamilyReportScreen({ navigation }) {
               <TouchableOpacity
                 onPress={() => navigation.navigate('IAPScreen', { requiredCredits: FAMILY_COST })}
               >
-                <Text style={styles.buyCreditsLink}>Nạp thêm credit ›</Text>
+                <Text style={styles.buyCreditsLink}>Buy more credits ›</Text>
               </TouchableOpacity>
             )}
           </View>

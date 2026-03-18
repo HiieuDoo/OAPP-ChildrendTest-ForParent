@@ -40,12 +40,12 @@ export default function ParentingResultScreen({ route, navigation }) {
   const handleUnlock = async () => {
     if (balance < COST) {
       Alert.alert(
-        'Không đủ credit 💎',
-        `Cần ${COST} credit để xem kết quả.\nSố dư: ${balance.toFixed(1)} credit`,
+        'Not enough credits 💎',
+        `Need ${COST} credits to view result.\nBalance: ${balance.toFixed(1)} credits`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () =>
               navigation.navigate('IAPScreen', {
                 requiredCredits: COST,
@@ -58,18 +58,18 @@ export default function ParentingResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận mở khóa',
-      `Dùng ${COST} credit để xem kết quả Phong Cách Nuôi Dạy?\nSố dư: ${balance.toFixed(1)} credit`,
+      'Confirm unlock',
+      `Use ${COST} credits to view Parenting Style result?\nBalance: ${balance.toFixed(1)} credits`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xác nhận',
+          text: 'Confirm',
           onPress: async () => {
             const success = await unlockWithCredits('parenting', COST);
             if (success) {
               await checkAccess();
             } else {
-              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
             }
           },
         },
@@ -81,12 +81,12 @@ export default function ParentingResultScreen({ route, navigation }) {
     const currentBalance = await getBalance();
     if (currentBalance < PDF_COST) {
       Alert.alert(
-        'Không đủ credit',
-        `Cần ${PDF_COST} credit để xuất PDF.`,
+        'Not enough credits',
+        `Need ${PDF_COST} credits to export PDF.`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () => navigation.navigate('IAPScreen', { requiredCredits: PDF_COST }),
           },
         ]
@@ -95,19 +95,19 @@ export default function ParentingResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận xuất báo cáo',
-      `Dùng ${PDF_COST} credit để xuất PDF?`,
+      'Confirm export',
+      `Use ${PDF_COST} credits to export PDF?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xuất',
+          text: 'Export',
           onPress: async () => {
             const spent = await spendCredits(PDF_COST);
-            if (!spent) { Alert.alert('Lỗi', 'Không đủ credit.'); return; }
+            if (!spent) { Alert.alert('Error', 'Not enough credits.'); return; }
             const exported = await exportReport({ type: 'parenting', result });
             await checkAccess();
             if (!exported.success) {
-              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo. Vui lòng thử lại.');
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
             }
           },
         },
@@ -134,7 +134,7 @@ export default function ParentingResultScreen({ route, navigation }) {
             <Text style={styles.balanceBadgeText}>💎 {balance.toFixed(1)}</Text>
           </TouchableOpacity>
           <Text style={styles.resultEmoji}>{primaryStyle?.emoji || '🌟'}</Text>
-          <Text style={styles.resultLabel}>Phong cách của bạn</Text>
+          <Text style={styles.resultLabel}>Your parenting style</Text>
           <Text style={styles.resultTitle}>{primaryStyle?.name || 'Kết Quả'}</Text>
           <Text style={styles.resultSubtitle}>{primaryStyle?.nameEn}</Text>
         </View>
@@ -142,7 +142,7 @@ export default function ParentingResultScreen({ route, navigation }) {
         <View style={styles.content}>
           {/* Style Distribution */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Phân Tích Phong Cách</Text>
+            <Text style={styles.cardTitle}>Style Analysis</Text>
             {Object.entries(percentages || {}).map(([styleId, pct]) => {
               const style = PARENTING_STYLES[styleId];
               return (
@@ -169,7 +169,7 @@ export default function ParentingResultScreen({ route, navigation }) {
 
           {/* Description */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Bạn Là Ai?</Text>
+            <Text style={styles.cardTitle}>Who Are You?</Text>
             <Text style={styles.descText}>{primaryStyle?.description}</Text>
           </Card>
 
@@ -178,14 +178,14 @@ export default function ParentingResultScreen({ route, navigation }) {
             <View style={styles.lockedContainer}>
               <View style={styles.blurredContent}>
                 <Card style={[styles.card, styles.blurred]}>
-                  <Text style={styles.cardTitle}>💪 Điểm Mạnh</Text>
+                  <Text style={styles.cardTitle}>💪 Strengths</Text>
                   <Text style={styles.blurredText}>
                     ██████████ ███████ ████████████████ ███████████████████████████████
                     ████████████ ███████████████████████████████████████
                   </Text>
                 </Card>
                 <Card style={[styles.card, styles.blurred]}>
-                  <Text style={styles.cardTitle}>🎯 Lời Khuyên</Text>
+                  <Text style={styles.cardTitle}>🎯 Advice</Text>
                   <Text style={styles.blurredText}>
                     ████████████████████████ ███████████████████████ ████████████████
                   </Text>
@@ -193,28 +193,28 @@ export default function ParentingResultScreen({ route, navigation }) {
               </View>
               <View style={styles.unlockCard}>
                 <Text style={styles.unlockEmoji}>🔒</Text>
-                <Text style={styles.unlockTitle}>Mở Khóa Phân Tích Đầy Đủ</Text>
+                <Text style={styles.unlockTitle}>Unlock Full Analysis</Text>
                 <Text style={styles.unlockDesc}>
-                  Xem điểm mạnh, điểm cần cải thiện và kế hoạch phát triển 30 ngày
+                  View strengths, areas to improve, and a 30-day development plan
                 </Text>
                 <View style={styles.creditCostRow}>
-                  <Text style={styles.creditCostLabel}>Chi phí:</Text>
+                  <Text style={styles.creditCostLabel}>Cost:</Text>
                   <Text style={styles.creditCostValue}>💎 {COST} credit</Text>
                   {balance < COST && (
                     <Text style={styles.creditShort}>
-                      (Cần thêm {(COST - balance).toFixed(1)} credit)
+                      (Need {(COST - balance).toFixed(1)} more credits)
                     </Text>
                   )}
                 </View>
                 <Button
-                  title={`Mở Khóa Ngay - ${COST} Credit`}
+                  title={`Unlock Now — ${COST} Credit`}
                   onPress={handleUnlock}
                   style={styles.unlockBtn}
                 />
                 <TouchableOpacity
                   onPress={() => navigation.navigate('IAPScreen', { requiredCredits: COST })}
                 >
-                  <Text style={styles.buyCreditsLink}>Nạp credit ›</Text>
+                  <Text style={styles.buyCreditsLink}>Buy credits ›</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -222,7 +222,7 @@ export default function ParentingResultScreen({ route, navigation }) {
             <>
               {/* Strengths */}
               <Card style={styles.card}>
-                <Text style={styles.cardTitle}>💪 Điểm Mạnh</Text>
+                <Text style={styles.cardTitle}>💪 Strengths</Text>
                 {primaryStyle?.strengths?.map((s, i) => (
                   <View key={i} style={styles.listItem}>
                     <Text style={styles.listDot}>•</Text>
@@ -233,7 +233,7 @@ export default function ParentingResultScreen({ route, navigation }) {
 
               {/* Improvements */}
               <Card style={styles.card}>
-                <Text style={styles.cardTitle}>📈 Cần Cải Thiện</Text>
+                <Text style={styles.cardTitle}>📈 Areas to Improve</Text>
                 {primaryStyle?.improvements?.map((s, i) => (
                   <View key={i} style={styles.listItem}>
                     <Text style={[styles.listDot, { color: COLORS.warning }]}>•</Text>
@@ -244,7 +244,7 @@ export default function ParentingResultScreen({ route, navigation }) {
 
               {/* Advice */}
               <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: COLORS.primary }]}>
-                <Text style={styles.cardTitle}>🎯 Lời Khuyên Cho Bạn</Text>
+                <Text style={styles.cardTitle}>🎯 Advice For You</Text>
                 {primaryStyle?.advice?.map((a, i) => (
                   <View key={i} style={[styles.listItem, styles.adviceItem]}>
                     <Text style={styles.adviceNum}>{i + 1}</Text>
@@ -255,7 +255,7 @@ export default function ParentingResultScreen({ route, navigation }) {
 
               {/* Export */}
               <Button
-                title={`📄 Xuất Báo Cáo PDF (${PDF_COST} credit)`}
+                title={`📄 Export PDF Report (${PDF_COST} credit)`}
                 onPress={handleExport}
                 variant="outline"
                 style={styles.exportBtn}
@@ -264,7 +264,7 @@ export default function ParentingResultScreen({ route, navigation }) {
           )}
 
           <Button
-            title="Làm lại bài test"
+            title="Retake test"
             onPress={() => navigation.replace('ParentingTest')}
             variant="ghost"
             style={styles.redoBtn}

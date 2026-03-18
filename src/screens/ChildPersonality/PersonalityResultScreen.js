@@ -37,12 +37,12 @@ export default function PersonalityResultScreen({ route, navigation }) {
   const handleUnlock = async () => {
     if (balance < COST) {
       Alert.alert(
-        'Không đủ credit 💎',
-        `Cần ${COST} credit để xem kết quả.\nSố dư: ${balance.toFixed(1)} credit`,
+        'Not enough credits 💎',
+        `Need ${COST} credits to view result.\nBalance: ${balance.toFixed(1)} credits`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () =>
               navigation.navigate('IAPScreen', {
                 requiredCredits: COST,
@@ -55,18 +55,18 @@ export default function PersonalityResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận mở khóa',
-      `Dùng ${COST} credit để xem kết quả Tính Cách Con?\nSố dư: ${balance.toFixed(1)} credit`,
+      'Confirm unlock',
+      `Use ${COST} credits to view Child Personality result?\nBalance: ${balance.toFixed(1)} credits`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xác nhận',
+          text: 'Confirm',
           onPress: async () => {
             const success = await unlockWithCredits('personality', COST);
             if (success) {
               await checkAccess();
             } else {
-              Alert.alert('Lỗi', 'Không thể mở khóa. Vui lòng thử lại.');
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
             }
           },
         },
@@ -78,12 +78,12 @@ export default function PersonalityResultScreen({ route, navigation }) {
     const currentBalance = await getBalance();
     if (currentBalance < PDF_COST) {
       Alert.alert(
-        'Không đủ credit',
-        `Cần ${PDF_COST} credit để xuất PDF.`,
+        'Not enough credits',
+        `Need ${PDF_COST} credits to export PDF.`,
         [
-          { text: 'Hủy', style: 'cancel' },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Nạp credit',
+            text: 'Buy credits',
             onPress: () => navigation.navigate('IAPScreen', { requiredCredits: PDF_COST }),
           },
         ]
@@ -92,19 +92,19 @@ export default function PersonalityResultScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Xác nhận xuất báo cáo',
-      `Dùng ${PDF_COST} credit để xuất PDF?`,
+      'Confirm export',
+      `Use ${PDF_COST} credits to export PDF?`,
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Xuất',
+          text: 'Export',
           onPress: async () => {
             const spent = await spendCredits(PDF_COST);
-            if (!spent) { Alert.alert('Lỗi', 'Không đủ credit.'); return; }
+            if (!spent) { Alert.alert('Error', 'Not enough credits.'); return; }
             const exported = await exportReport({ type: 'personality', result });
             await checkAccess();
             if (!exported.success) {
-              Alert.alert('Lỗi xuất báo cáo', exported.error || 'Không thể xuất báo cáo. Vui lòng thử lại.');
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
             }
           },
         },
@@ -131,7 +131,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
             <Text style={styles.balanceBadgeText}>💎 {balance.toFixed(1)}</Text>
           </TouchableOpacity>
           <Text style={styles.headerEmoji}>{primaryType?.emoji || '🌟'}</Text>
-          <Text style={styles.headerLabel}>Tính cách của bé</Text>
+          <Text style={styles.headerLabel}>Your child's personality</Text>
           <Text style={styles.headerTitle}>{primaryType?.name}</Text>
           <View style={styles.ageTag}>
             <Text style={styles.ageTagText}>
@@ -143,7 +143,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
         <View style={styles.content}>
           {/* Traits */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Đặc Điểm Nổi Bật</Text>
+            <Text style={styles.cardTitle}>Key Traits</Text>
             <Text style={styles.descText}>{primaryType?.description}</Text>
             <View style={styles.traitsRow}>
               {primaryType?.traits?.map((trait, i) => (
@@ -156,7 +156,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
 
           {/* Type Distribution */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Phân Tích Tính Cách</Text>
+            <Text style={styles.cardTitle}>Personality Analysis</Text>
             {Object.entries(percentages || {}).map(([typeId, pct]) => {
               const type = PERSONALITY_TYPES[typeId];
               if (!type) return null;
@@ -181,28 +181,28 @@ export default function PersonalityResultScreen({ route, navigation }) {
           {!hasAccess ? (
             <View style={styles.unlockCard}>
               <Text style={styles.unlockEmoji}>🔒</Text>
-              <Text style={styles.unlockTitle}>Mở Khóa Lời Khuyên Chuyên Sâu</Text>
+              <Text style={styles.unlockTitle}>Unlock In-Depth Advice</Text>
               <Text style={styles.unlockDesc}>
-                Nhận lời khuyên nuôi dưỡng, hoạt động phù hợp và kế hoạch phát triển theo độ tuổi
+                Get parenting tips, recommended activities, and an age-based development plan
               </Text>
               <View style={styles.creditCostRow}>
-                <Text style={styles.creditCostLabel}>Chi phí:</Text>
+                <Text style={styles.creditCostLabel}>Cost:</Text>
                 <Text style={[styles.creditCostValue, { color: accentColor }]}>💎 {COST} credit</Text>
                 {balance < COST && (
                   <Text style={styles.creditShort}>
-                    (Cần thêm {(COST - balance).toFixed(1)} credit)
+                    (Need {(COST - balance).toFixed(1)} more credits)
                   </Text>
                 )}
               </View>
               <Button
-                title={`Mở Khóa Ngay - ${COST} Credit`}
+                title={`Unlock Now — ${COST} Credit`}
                 onPress={handleUnlock}
                 style={[styles.unlockBtn, { backgroundColor: accentColor }]}
               />
               <TouchableOpacity
                 onPress={() => navigation.navigate('IAPScreen', { requiredCredits: COST })}
               >
-                <Text style={[styles.buyCreditsLink, { color: accentColor }]}>Nạp credit ›</Text>
+                <Text style={[styles.buyCreditsLink, { color: accentColor }]}>Buy credits ›</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -210,7 +210,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
               {ageAdvice && (
                 <>
                   <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: accentColor }]}>
-                    <Text style={styles.cardTitle}>💡 Lời Khuyên Nuôi Dưỡng</Text>
+                    <Text style={styles.cardTitle}>💡 Parenting Tips</Text>
                     {ageAdvice.tips?.map((tip, i) => (
                       <View key={i} style={styles.listItem}>
                         <Text style={[styles.listDot, { color: accentColor }]}>•</Text>
@@ -220,7 +220,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
                   </Card>
 
                   <Card style={styles.card}>
-                    <Text style={styles.cardTitle}>🎮 Hoạt Động Phù Hợp</Text>
+                    <Text style={styles.cardTitle}>🎮 Recommended Activities</Text>
                     <View style={styles.activitiesRow}>
                       {ageAdvice.activities?.map((act, i) => (
                         <View key={i} style={[styles.activityBadge, { backgroundColor: accentColor + '15' }]}>
@@ -233,7 +233,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
               )}
 
               <Button
-                title={`📄 Xuất Báo Cáo PDF (${PDF_COST} credit)`}
+                title={`📄 Export PDF Report (${PDF_COST} credit)`}
                 onPress={handleExport}
                 variant="outline"
                 style={styles.exportBtn}
@@ -242,7 +242,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
           )}
 
           <Button
-            title="Làm lại bài test"
+            title="Retake test"
             onPress={() => navigation.replace('PersonalityTest')}
             variant="ghost"
           />

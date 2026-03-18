@@ -102,14 +102,14 @@ export default function PersonalityTestScreen({ navigation }) {
           <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
             <Text style={styles.backBtnText}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Tính Cách Con</Text>
+          <Text style={styles.headerTitle}>Child Personality</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.ageTitle}>Bé đang ở độ tuổi nào?</Text>
+          <Text style={styles.ageTitle}>How old is your child?</Text>
           <Text style={styles.ageSubtitle}>
-            Chọn nhóm tuổi để nhận câu hỏi phù hợp nhất với giai đoạn phát triển của con
+            Select an age group to get questions tailored to your child's stage of development
           </Text>
 
           <View style={styles.ageGrid}>
@@ -137,14 +137,14 @@ export default function PersonalityTestScreen({ navigation }) {
 
           <View style={styles.ageNote}>
             <Text style={styles.ageNoteText}>
-              💡 Câu hỏi được thiết kế riêng theo từng giai đoạn phát triển của trẻ
+              💡 Questions are specifically designed for each stage of child development
             </Text>
           </View>
         </ScrollView>
 
         <View style={styles.footer}>
           <Button
-            title="Bắt Đầu Test"
+            title="Start Test"
             onPress={handleStartTest}
             disabled={!selectedAge}
           />
@@ -163,7 +163,7 @@ export default function PersonalityTestScreen({ navigation }) {
           <Text style={styles.backBtnText}>‹</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Tính Cách Con</Text>
+          <Text style={styles.headerTitle}>Child Personality</Text>
           <Text style={styles.headerSub}>
             {selectedAge?.emoji} {selectedAge?.label} · Câu {currentQ + 1}/{questions.length}
           </Text>
@@ -178,7 +178,7 @@ export default function PersonalityTestScreen({ navigation }) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.questionCard, { borderTopColor: '#FF6B35' }]}>
           <View style={[styles.questionBadge, { backgroundColor: '#FFF0EB' }]}>
-            <Text style={[styles.questionBadgeText, { color: '#FF6B35' }]}>Câu {currentQ + 1}</Text>
+            <Text style={[styles.questionBadgeText, { color: '#FF6B35' }]}>Q{currentQ + 1}</Text>
           </View>
           <Text style={styles.questionText}>{question?.question}</Text>
         </View>
@@ -215,7 +215,7 @@ export default function PersonalityTestScreen({ navigation }) {
 
       <View style={styles.footer}>
         <Button
-          title={isLast ? 'Xem Kết Quả' : 'Tiếp Theo'}
+          title={isLast ? 'View Results' : 'Next'}
           onPress={handleNext}
           disabled={!selected}
           style={{ backgroundColor: '#FF6B35' }}
