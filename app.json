@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mindful Guardian",
     "slug": "mindful-guardian",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mindfulguardian.app",
-      "buildNumber": "1"
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
         "backgroundColor": "#6C63FF"
       },
       "package": "com.mindfulguardian.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -36,6 +36,12 @@
       [
         "expo-file-system",
         {}
+      ],
+      [
+        "react-native-iap",
+        {
+          "paymentProvider": "Play Store"
+        }
       ]
     ],
     "extra": {
