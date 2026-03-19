@@ -95,7 +95,17 @@ export default function ParentingTestScreen({ navigation }) {
             Q{currentQ + 1}/{PARENTING_QUESTIONS.length}
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.quitBtn}
+          onPress={() =>
+            Alert.alert('Quit Test?', 'Your progress will not be saved.', [
+              { text: 'Continue', style: 'cancel' },
+              { text: 'Quit', style: 'destructive', onPress: () => navigation.goBack() },
+            ])
+          }
+        >
+          <Text style={styles.quitBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.progressContainer}>
@@ -182,6 +192,15 @@ const styles = StyleSheet.create({
     ...SHADOWS.sm,
   },
   backBtnText: { fontSize: 28, color: COLORS.text, lineHeight: 32 },
+  quitBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFE5E5',
+    borderRadius: RADIUS.md,
+  },
+  quitBtnText: { fontSize: 16, color: '#FF6B6B', fontWeight: '700' },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { ...TYPOGRAPHY.h4, color: COLORS.text },
   headerSub: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },
