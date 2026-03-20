@@ -121,18 +121,17 @@ export default function FamilyReportScreen({ navigation }) {
           text: 'Export',
           onPress: async () => {
             setExporting(true);
-            const { spendCredits } = await import('../../utils/storage');
-            const spent = await spendCredits(CREDIT_COSTS.EXPORT_PDF);
-            if (!spent) {
-              Alert.alert('Error', 'Unable to deduct credits.');
-              setExporting(false);
-              return;
-            }
             const exported = await exportReport({ type: 'family', result: results });
             setExporting(false);
-            await loadData();
-            if (!exported.success) {
-              Alert.alert('Export failed', exported.error || 'Unable to export report.');
+            if (!exported.success && !exported.cancelled) {
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
+              return;
+            }
+            if (!exported.cancelled) {
+              const { spendCredits } = await import('../../utils/storage');
+              const spent = await spendCredits(CREDIT_COSTS.EXPORT_PDF);
+              await loadData();
+              if (!spent) Alert.alert('Warning', 'Export succeeded but credits could not be deducted. Please contact support.');
             }
           },
         },

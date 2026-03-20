@@ -10,20 +10,44 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
 import { CREDIT_PACKAGES, CREDIT_COSTS } from '../../data/iapProducts';
-import { purchaseCredits, getBalance } from '../../utils/iapService';
+import { purchaseCredits, getBalance, initIAP, loadStoreProducts } from '../../utils/iapService';
 
 export default function IAPScreen({ route, navigation }) {
   const { onSuccess, requiredCredits } = route.params || {};
-  const [purchasing, setPurchasing] = useState(null); // packageId being purchased
+  const [purchasing, setPurchasing] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [storeProducts, setStoreProducts] = useState({});
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   useEffect(() => {
     loadBalance();
+    loadProducts();
   }, []);
 
   const loadBalance = async () => {
     const b = await getBalance();
     setBalance(b);
+  };
+
+  const loadProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      await initIAP();
+      const products = await loadStoreProducts();
+      const map = {};
+      products.forEach((p) => {
+        map[p.productId] = p;
+      });
+      setStoreProducts(map);
+    } catch (e) {
+      // Will fall back to hardcoded prices
+    }
+    setLoadingProducts(false);
+  };
+
+  const getDisplayPrice = (pkg) => {
+    const storeProduct = storeProducts[pkg.id];
+    return storeProduct?.localizedPrice || pkg.priceUSD;
   };
 
   const handlePurchase = async (pkg) => {
@@ -36,11 +60,11 @@ export default function IAPScreen({ route, navigation }) {
           setPurchasing(null);
           setBalance(newBalance);
           Alert.alert(
-            'Credits added! 💎',
-            `Added ${credits} credits.\nNew balance: ${newBalance} credits`,
+            '✅ Purchase Successful!',
+            `${credits} credits added.\nNew balance: ${newBalance} credits`,
             [
               {
-                text: 'Continue',
+                text: 'Great!',
                 onPress: () => {
                   if (onSuccess) onSuccess(newBalance);
                   if (requiredCredits && newBalance >= requiredCredits) {
@@ -51,14 +75,20 @@ export default function IAPScreen({ route, navigation }) {
             ]
           );
         },
-        () => {
+        (error) => {
           setPurchasing(null);
-          Alert.alert('Error', 'Transaction failed. Please try again.');
+          Alert.alert(
+            '❌ Purchase Failed',
+            error.message || 'Something went wrong. Please try again.',
+            [{ text: 'OK' }]
+          );
         }
       );
+      // If purchase was cancelled (no callbacks fired), just reset loading
+      if (purchasing === pkg.id) setPurchasing(null);
     } catch (e) {
       setPurchasing(null);
-      Alert.alert('Error', 'Something went wrong.');
+      Alert.alert('Error', 'Unexpected error. Please try again.');
     }
   };
 
@@ -78,13 +108,13 @@ export default function IAPScreen({ route, navigation }) {
           <Text style={styles.balanceLabel}>Your balance</Text>
           <View style={styles.balanceRow}>
             <Text style={styles.balanceIcon}>💎</Text>
-            <Text style={styles.balanceNum}>{balance.toFixed(1)}</Text>
-            <Text style={styles.balanceUnit}>credit</Text>
+            <Text style={styles.balanceNum}>{balance.toFixed(0)}</Text>
+            <Text style={styles.balanceUnit}>credits</Text>
           </View>
           {requiredCredits && balance < requiredCredits && (
             <View style={styles.alertBadge}>
               <Text style={styles.alertText}>
-                Need {(requiredCredits - balance).toFixed(1)} more credits to unlock
+                Need {requiredCredits - balance} more credits to unlock
               </Text>
             </View>
           )}
@@ -94,38 +124,31 @@ export default function IAPScreen({ route, navigation }) {
         <View style={styles.guideCard}>
           <Text style={styles.guideTitle}>💡 What are credits used for?</Text>
           <View style={styles.guideList}>
-            <View style={styles.guideItem}>
-              <Text style={styles.guideEmoji}>🧠</Text>
-              <Text style={styles.guideText}>View Parenting Style result</Text>
-              <Text style={styles.guideCost}>{CREDIT_COSTS.PARENTING_RESULT} credit</Text>
-            </View>
-            <View style={styles.guideItem}>
-              <Text style={styles.guideEmoji}>🌟</Text>
-              <Text style={styles.guideText}>View Child Personality result</Text>
-              <Text style={styles.guideCost}>{CREDIT_COSTS.PERSONALITY_RESULT} credit</Text>
-            </View>
-            <View style={styles.guideItem}>
-              <Text style={styles.guideEmoji}>💝</Text>
-              <Text style={styles.guideText}>View EQ Score result</Text>
-              <Text style={styles.guideCost}>{CREDIT_COSTS.EQ_RESULT} credit</Text>
-            </View>
-            <View style={[styles.guideItem, styles.guideItemHighlight]}>
-              <Text style={styles.guideEmoji}>👨‍👩‍👧‍👦</Text>
-              <Text style={[styles.guideText, { fontWeight: '600' }]}>Family Report</Text>
-              <Text style={[styles.guideCost, { color: COLORS.secondary }]}>
-                {CREDIT_COSTS.FAMILY_REPORT} credits
-              </Text>
-            </View>
-            <View style={styles.guideItem}>
-              <Text style={styles.guideEmoji}>📄</Text>
-              <Text style={styles.guideText}>Export PDF report</Text>
-              <Text style={styles.guideCost}>{CREDIT_COSTS.EXPORT_PDF} credit</Text>
-            </View>
+            {[
+              { emoji: '🧠', label: 'Parenting Style result', cost: CREDIT_COSTS.PARENTING_RESULT },
+              { emoji: '🌟', label: 'Child Personality result', cost: CREDIT_COSTS.PERSONALITY_RESULT },
+              { emoji: '💝', label: 'EQ Score result', cost: CREDIT_COSTS.EQ_RESULT },
+              { emoji: '👨‍👩‍👧‍👦', label: 'Family Report', cost: CREDIT_COSTS.FAMILY_REPORT, highlight: true },
+              { emoji: '📄', label: 'Export report', cost: CREDIT_COSTS.EXPORT_PDF },
+            ].map((item, i) => (
+              <View key={i} style={[styles.guideItem, item.highlight && styles.guideItemHighlight]}>
+                <Text style={styles.guideEmoji}>{item.emoji}</Text>
+                <Text style={[styles.guideText, item.highlight && { fontWeight: '600' }]}>{item.label}</Text>
+                <Text style={[styles.guideCost, item.highlight && { color: COLORS.secondary }]}>
+                  {item.cost} credit{item.cost !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
         {/* Credit Packages */}
-        <Text style={styles.sectionTitle}>Choose a Package</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Choose a Package</Text>
+          {loadingProducts && (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 8 }} />
+          )}
+        </View>
 
         {CREDIT_PACKAGES.map((pkg) => (
           <TouchableOpacity
@@ -165,7 +188,7 @@ export default function IAPScreen({ route, navigation }) {
                 <ActivityIndicator size="small" color={pkg.color} />
               ) : (
                 <View style={[styles.priceBtn, { backgroundColor: pkg.color }]}>
-                  <Text style={styles.priceBtnText}>{pkg.priceUSD}</Text>
+                  <Text style={styles.priceBtnText}>{getDisplayPrice(pkg)}</Text>
                 </View>
               )}
             </View>
@@ -176,9 +199,9 @@ export default function IAPScreen({ route, navigation }) {
         <View style={styles.legalSection}>
           <Text style={styles.legalText}>
             • Credits never expire — use anytime{'\n'}
-            • Secure payment via App Store / Google Play{'\n'}
+            • Secure payment via Google Play / App Store{'\n'}
             • No refunds once credits have been used{'\n'}
-            • $0.20 USD per credit
+            • $0.10 USD per credit
           </Text>
           <TouchableOpacity>
             <Text style={styles.restoreText}>Restore purchases</Text>
@@ -262,7 +285,8 @@ const styles = StyleSheet.create({
   guideEmoji: { fontSize: 18, width: 26 },
   guideText: { ...TYPOGRAPHY.bodySmall, color: COLORS.text, flex: 1 },
   guideCost: { ...TYPOGRAPHY.bodySmall, color: COLORS.primary, fontWeight: '700' },
-  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
+  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text },
   packageCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
@@ -274,14 +298,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'visible',
   },
-  packageCardPopular: {
-    borderWidth: 2,
-    borderColor: COLORS.secondary,
-  },
-  packageCardBest: {
-    borderWidth: 2,
-    borderColor: COLORS.warning,
-  },
+  packageCardPopular: { borderWidth: 2, borderColor: COLORS.secondary },
+  packageCardBest: { borderWidth: 2, borderColor: COLORS.warning },
   packageBadge: {
     position: 'absolute',
     top: -10,

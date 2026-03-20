@@ -100,12 +100,15 @@ export default function EQResultScreen({ route, navigation }) {
         {
           text: 'Export',
           onPress: async () => {
-            const spent = await spendCredits(PDF_COST);
-            if (!spent) { Alert.alert('Error', 'Not enough credits.'); return; }
             const exported = await exportReport({ type: 'eq', result });
-            await checkAccess();
-            if (!exported.success) {
+            if (!exported.success && !exported.cancelled) {
               Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
+              return;
+            }
+            if (!exported.cancelled) {
+              const spent = await spendCredits(PDF_COST);
+              await checkAccess();
+              if (!spent) Alert.alert('Warning', 'Export succeeded but credits could not be deducted. Please contact support.');
             }
           },
         },
