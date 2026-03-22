@@ -129,6 +129,21 @@ export const purchaseCredits = async (packageId, credits, onSuccess, onError) =>
       }
     }
 
+    // Must fetch product from store before requesting purchase
+    let products = [];
+    try {
+      products = await getProducts({ skus: [packageId] });
+    } catch (e) {
+      console.warn('getProducts error:', e);
+    }
+
+    if (!products || products.length === 0) {
+      const msg =
+        'Product not found on Google Play.\nMake sure the app is published and the product is ACTIVE on Play Console.';
+      if (onError) onError({ message: msg });
+      return { success: false, error: msg };
+    }
+
     return new Promise((resolve) => {
       let purchaseSub;
       let errorSub;
