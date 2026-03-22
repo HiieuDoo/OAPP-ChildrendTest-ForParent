@@ -6,18 +6,24 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
-import { IAP_PRODUCTS } from '../../data/iapProducts';
+import { CREDIT_COSTS } from '../../data/iapProducts';
 import Button from '../../components/Button';
-import { checkPurchase, purchaseProduct } from '../../utils/iapService';
+import { hasAccessToResult, unlockWithCredits, getBalance } from '../../utils/iapService';
 import { getTestResult } from '../../utils/storage';
 import { exportReport } from '../../utils/pdfExport';
 
+const FAMILY_COST = CREDIT_COSTS.FAMILY_REPORT; // 2 credits
+
 export default function FamilyReportScreen({ navigation }) {
-  const [purchased, setPurchased] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(true);
+  const [balance, setBalance] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -29,91 +35,158 @@ export default function FamilyReportScreen({ navigation }) {
   }, [navigation]);
 
   const loadData = async () => {
-    const [hasPurchase, parentingResult, personalityResult, eqResult] = await Promise.all([
-      checkPurchase('family_report_bundle'),
+    const [access, parentingResult, personalityResult, eqResult, bal] = await Promise.all([
+      hasAccessToResult('family'),
       getTestResult('parenting'),
       getTestResult('personality'),
       getTestResult('eq'),
+      getBalance(),
     ]);
 
-    setPurchased(hasPurchase);
+    setHasAccess(access);
     setResults({
       parenting: parentingResult,
       personality: personalityResult,
       eq: eqResult,
     });
+    setBalance(bal);
     setLoading(false);
   };
 
-  const handlePurchase = async () => {
-    const result = await purchaseProduct(
-      'family_report_bundle',
-      () => {
-        Alert.alert('Thành công! 🎉', 'Gói Family Report đã được kích hoạt!', [
-          { text: 'OK', onPress: () => loadData() },
-        ]);
-      },
-      () => Alert.alert('Lỗi', 'Giao dịch không thành công.')
+  const handleUnlock = async () => {
+    if (balance < FAMILY_COST) {
+      Alert.alert(
+        'Not enough credits 💎',
+        `You need ${FAMILY_COST} credits to view the family report.\nBalance: ${balance.toFixed(1)} credits`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Buy credits',
+            onPress: () =>
+              navigation.navigate('IAPScreen', {
+                requiredCredits: FAMILY_COST,
+                onSuccess: () => loadData(),
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Confirm unlock',
+      `Use ${FAMILY_COST} credits to view the Family Report?\nBalance: ${balance.toFixed(1)} credits`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setUnlocking(true);
+            const success = await unlockWithCredits('family', FAMILY_COST);
+            if (success) {
+              await loadData();
+              Alert.alert('Unlocked! 🎉', 'Family report is now active!');
+            } else {
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
+            }
+            setUnlocking(false);
+          },
+        },
+      ]
     );
   };
 
   const handleExportFamily = async () => {
-    const exported = await exportReport({ type: 'family', result: results });
-    if (!exported.success) Alert.alert('Lỗi', 'Không thể xuất báo cáo.');
+    if (balance < CREDIT_COSTS.EXPORT_PDF) {
+      Alert.alert(
+        'Not enough credits',
+        `Need ${CREDIT_COSTS.EXPORT_PDF} credits to export PDF.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Buy credits',
+            onPress: () => navigation.navigate('IAPScreen', { requiredCredits: CREDIT_COSTS.EXPORT_PDF }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Confirm export',
+      `Use ${CREDIT_COSTS.EXPORT_PDF} credits to export PDF?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export',
+          onPress: async () => {
+            setExporting(true);
+            const exported = await exportReport({ type: 'family', result: results });
+            setExporting(false);
+            if (!exported.success && !exported.cancelled) {
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
+              return;
+            }
+            if (!exported.cancelled) {
+              const { spendCredits } = await import('../../utils/storage');
+              const spent = await spendCredits(CREDIT_COSTS.EXPORT_PDF);
+              await loadData();
+              if (!spent) Alert.alert('Warning', 'Export succeeded but credits could not be deducted. Please contact support.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const completedCount = Object.values(results).filter(Boolean).length;
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>‹</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Family Report</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.creditBadge}
+          onPress={() => navigation.navigate('IAPScreen', {})}
+        >
+          <Text style={styles.creditText}>💎 {balance.toFixed(1)}</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
         {/* Banner */}
         <View style={styles.banner}>
           <Text style={styles.bannerEmoji}>👨‍👩‍👧‍👦</Text>
-          <Text style={styles.bannerTitle}>Báo Cáo Gia Đình Toàn Diện</Text>
+          <Text style={styles.bannerTitle}>Complete Family Report</Text>
           <Text style={styles.bannerDesc}>
-            Tổng hợp phân tích từ cả 3 bài test để hiểu sâu hơn về gia đình bạn
+            Combined analysis from all 3 tests for a deeper understanding of your family
           </Text>
-          {purchased && (
+          {hasAccess ? (
             <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>✓ Đã kích hoạt</Text>
+              <Text style={styles.activeBadgeText}>✓ Activated</Text>
+            </View>
+          ) : (
+            <View style={styles.costBadge}>
+              <Text style={styles.costBadgeText}>💎 {FAMILY_COST} credit</Text>
             </View>
           )}
         </View>
 
-        {/* Test Status */}
-        <Text style={styles.sectionTitle}>Tiến Trình Bài Test ({completedCount}/3)</Text>
+        {/* Test Progress */}
+        <Text style={styles.sectionTitle}>Test Progress ({completedCount}/3)</Text>
 
         {[
-          {
-            key: 'parenting',
-            name: 'Phong Cách Nuôi Dạy',
-            emoji: '🧠',
-            color: COLORS.primary,
-            screen: 'ParentingTest',
-          },
-          {
-            key: 'personality',
-            name: 'Tính Cách Con',
-            emoji: '🌟',
-            color: '#FF6B35',
-            screen: 'PersonalityTest',
-          },
-          {
-            key: 'eq',
-            name: 'Chỉ Số EQ',
-            emoji: '💝',
-            color: '#FF69B4',
-            screen: 'EQTest',
-          },
+          { key: 'parenting', name: 'Parenting Style', emoji: '🧠', color: COLORS.primary, screen: 'ParentingTest' },
+          { key: 'personality', name: 'Child Personality', emoji: '🌟', color: '#FF6B35', screen: 'PersonalityTest' },
+          { key: 'eq', name: 'EQ Score', emoji: '💝', color: '#FF69B4', screen: 'EQTest' },
         ].map((test) => {
           const hasResult = !!results[test.key];
           return (
@@ -129,27 +202,27 @@ export default function FamilyReportScreen({ navigation }) {
               <View style={styles.testStatusInfo}>
                 <Text style={styles.testStatusName}>{test.name}</Text>
                 <Text style={[styles.testStatusState, { color: hasResult ? COLORS.success : COLORS.textSecondary }]}>
-                  {hasResult ? '✓ Đã hoàn thành' : '○ Chưa làm'}
+                  {hasResult ? '✓ Completed' : '○ Not done'}
                 </Text>
               </View>
               {!hasResult && (
                 <View style={[styles.doBtn, { backgroundColor: test.color }]}>
-                  <Text style={styles.doBtnText}>Làm</Text>
+                  <Text style={styles.doBtnText}>Start</Text>
                 </View>
               )}
             </TouchableOpacity>
           );
         })}
 
-        {/* Family Report Content */}
-        {purchased ? (
+        {/* Content */}
+        {hasAccess ? (
           <>
-            <Text style={styles.sectionTitle}>Báo Cáo Gia Đình</Text>
+            <Text style={styles.sectionTitle}>Family Report</Text>
 
             {results.parenting && (
               <View style={[styles.resultCard, { borderLeftColor: COLORS.primary }]}>
                 <Text style={styles.resultCardTitle}>
-                  🧠 Phong cách: {results.parenting.result?.primaryStyle?.name}
+                  🧠 Style: {results.parenting.result?.primaryStyle?.name}
                 </Text>
                 <Text style={styles.resultCardDesc}>
                   {results.parenting.result?.primaryStyle?.description}
@@ -160,7 +233,7 @@ export default function FamilyReportScreen({ navigation }) {
             {results.personality && (
               <View style={[styles.resultCard, { borderLeftColor: '#FF6B35' }]}>
                 <Text style={styles.resultCardTitle}>
-                  🌟 Tính cách bé: {results.personality.result?.primaryType?.name}
+                  🌟 Child personality: {results.personality.result?.primaryType?.name}
                 </Text>
                 <Text style={styles.resultCardDesc}>
                   {results.personality.result?.primaryType?.description}
@@ -174,58 +247,74 @@ export default function FamilyReportScreen({ navigation }) {
                   💝 EQ: {results.eq.result?.level?.level} ({results.eq.result?.totalScore}/{results.eq.result?.maxTotal})
                 </Text>
                 <Text style={styles.resultCardDesc}>
-                  Mức độ trí tuệ cảm xúc: {results.eq.result?.percentage}% điểm tối đa
+                  Emotional intelligence level: {results.eq.result?.percentage}% of maximum
                 </Text>
               </View>
             )}
 
             {completedCount === 3 && (
               <View style={styles.insightCard}>
-                <Text style={styles.insightTitle}>🔍 Phân Tích Gia Đình</Text>
+                <Text style={styles.insightTitle}>🔍 Family Insight</Text>
                 <Text style={styles.insightText}>
-                  Dựa trên kết quả 3 bài test, bạn có phong cách nuôi dạy{' '}
-                  <Text style={styles.bold}>{results.parenting?.result?.primaryStyle?.name}</Text> - phù hợp
-                  với tính cách{' '}
-                  <Text style={styles.bold}>{results.personality?.result?.primaryType?.name}</Text> của bé.
-                  Chỉ số EQ ở mức{' '}
-                  <Text style={styles.bold}>{results.eq?.result?.level?.level}</Text> cho thấy bé đang
-                  phát triển trí tuệ cảm xúc tốt.
+                  Based on all 3 tests, your parenting style is{' '}
+                  <Text style={styles.bold}>{results.parenting?.result?.primaryStyle?.name}</Text> — well matched
+                  with your child's{' '}
+                  <Text style={styles.bold}>{results.personality?.result?.primaryType?.name}</Text> personality.
+                  Their EQ level of{' '}
+                  <Text style={styles.bold}>{results.eq?.result?.level?.level}</Text> shows healthy emotional development.
                 </Text>
               </View>
             )}
 
             <Button
-              title="📄 Xuất PDF Gia Đình"
+              title={exporting ? 'Exporting...' : `📄 Export PDF (${CREDIT_COSTS.EXPORT_PDF} credit)`}
               onPress={handleExportFamily}
               style={styles.exportBtn}
+              disabled={exporting}
             />
           </>
         ) : (
-          <View style={styles.purchaseCard}>
-            <Text style={styles.purchaseTitle}>Mua Gói Family Report</Text>
-            <Text style={styles.purchaseDesc}>
-              Nhận toàn bộ phân tích cho cả gia đình với giá ưu đãi
+          <View style={styles.lockedCard}>
+            <Text style={styles.lockEmoji}>🔒</Text>
+            <Text style={styles.lockTitle}>Unlock Family Report</Text>
+            <Text style={styles.lockDesc}>
+              Use {FAMILY_COST} credits to view the complete combined analysis from all 3 tests
             </Text>
-            <View style={styles.purchaseFeatures}>
-              {IAP_PRODUCTS.FAMILY_REPORT.features.map((f, i) => (
-                <View key={i} style={styles.purchaseFeatureItem}>
-                  <Text style={[styles.purchaseFeatureCheck, { color: '#4ECDC4' }]}>✓</Text>
-                  <Text style={styles.purchaseFeatureText}>{f}</Text>
+            <View style={styles.lockFeatures}>
+              {[
+                'All 3 test results',
+                'Parent-child compatibility analysis',
+                'Family communication tips',
+                'Full PDF report export',
+              ].map((f, i) => (
+                <View key={i} style={styles.lockFeatureItem}>
+                  <Text style={styles.lockFeatureCheck}>✓</Text>
+                  <Text style={styles.lockFeatureText}>{f}</Text>
                 </View>
               ))}
             </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.oldPrice}>77.000đ</Text>
-              <Text style={styles.newPrice}>{IAP_PRODUCTS.FAMILY_REPORT.price}</Text>
-              <View style={styles.saveBadge}>
-                <Text style={styles.saveText}>Tiết kiệm 37%</Text>
-              </View>
+            <View style={styles.costRow}>
+              <Text style={styles.costLabel}>Cost:</Text>
+              <Text style={styles.costValue}>💎 {FAMILY_COST} credits</Text>
+              {balance < FAMILY_COST && (
+                <Text style={styles.costShort}>
+                  (Need {(FAMILY_COST - balance).toFixed(1)} more credits)
+                </Text>
+              )}
             </View>
             <Button
-              title={`Mua Gói Family - ${IAP_PRODUCTS.FAMILY_REPORT.price}`}
-              onPress={handlePurchase}
+              title={unlocking ? 'Unlocking...' : `Unlock Now — ${FAMILY_COST} Credits`}
+              onPress={handleUnlock}
+              disabled={unlocking}
               style={{ backgroundColor: '#4ECDC4' }}
             />
+            {balance < FAMILY_COST && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('IAPScreen', { requiredCredits: FAMILY_COST })}
+              >
+                <Text style={styles.buyCreditsLink}>Buy more credits ›</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -238,23 +327,22 @@ export default function FamilyReportScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
+    paddingTop: 52,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 52,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
+    justifyContent: 'space-between',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+  headerTitle: { ...TYPOGRAPHY.h2, color: COLORS.text },
+  creditBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
     ...SHADOWS.sm,
   },
-  backBtnText: { fontSize: 28, color: COLORS.text, lineHeight: 32 },
-  headerTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, flex: 1, textAlign: 'center' },
+  creditText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
   content: { flex: 1, paddingHorizontal: SPACING.lg },
   banner: {
     backgroundColor: '#1A1A2E',
@@ -275,7 +363,15 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   activeBadgeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
-  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
+  costBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.sm,
+  },
+  costBadgeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.textInverse, fontWeight: '700' },
+  sectionTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm, marginTop: SPACING.sm },
   testStatus: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
@@ -315,7 +411,7 @@ const styles = StyleSheet.create({
   insightText: { ...TYPOGRAPHY.body, color: COLORS.text, lineHeight: 24 },
   bold: { fontWeight: '700', color: COLORS.primary },
   exportBtn: { marginBottom: SPACING.md },
-  purchaseCard: {
+  lockedCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
@@ -323,17 +419,32 @@ const styles = StyleSheet.create({
     borderColor: '#4ECDC4',
     ...SHADOWS.lg,
     marginBottom: SPACING.md,
+    alignItems: 'center',
   },
-  purchaseTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginBottom: 8, textAlign: 'center' },
-  purchaseDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md },
-  purchaseFeatures: { marginBottom: SPACING.md },
-  purchaseFeatureItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  purchaseFeatureCheck: { fontWeight: '700', fontSize: 16 },
-  purchaseFeatureText: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1, lineHeight: 22 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md, justifyContent: 'center' },
-  oldPrice: { ...TYPOGRAPHY.body, color: COLORS.textMuted, textDecorationLine: 'line-through' },
-  newPrice: { fontSize: 24, fontWeight: '800', color: '#4ECDC4' },
-  saveBadge: { backgroundColor: COLORS.secondary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
-  saveText: { fontSize: 11, fontWeight: '800', color: COLORS.textInverse },
+  lockEmoji: { fontSize: 48, marginBottom: SPACING.sm },
+  lockTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
+  lockDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md, lineHeight: 22 },
+  lockFeatures: { alignSelf: 'stretch', marginBottom: SPACING.md },
+  lockFeatureItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  lockFeatureCheck: { color: '#4ECDC4', fontWeight: '700', fontSize: 16 },
+  lockFeatureText: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1, lineHeight: 22 },
+  costRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  costLabel: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
+  costValue: { fontSize: 18, fontWeight: '800', color: '#4ECDC4' },
+  costShort: { ...TYPOGRAPHY.caption, color: COLORS.secondary, width: '100%', textAlign: 'center' },
+  buyCreditsLink: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+    marginTop: SPACING.sm,
+    fontWeight: '600',
+  },
   bottomPad: { height: SPACING.xl },
 });

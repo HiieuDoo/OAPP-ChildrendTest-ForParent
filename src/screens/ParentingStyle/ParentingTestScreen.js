@@ -45,9 +45,9 @@ export default function ParentingTestScreen({ navigation }) {
 
   const handleBack = () => {
     if (currentQ === 0) {
-      Alert.alert('Thoát bài test?', 'Tiến trình sẽ không được lưu.', [
-        { text: 'Tiếp tục làm', style: 'cancel' },
-        { text: 'Thoát', onPress: () => navigation.goBack() },
+      Alert.alert('Exit test?', 'Progress will not be saved.', [
+        { text: 'Continue', style: 'cancel' },
+        { text: 'Exit', onPress: () => navigation.goBack() },
       ]);
     } else {
       setCurrentQ(currentQ - 1);
@@ -90,12 +90,22 @@ export default function ParentingTestScreen({ navigation }) {
           <Text style={styles.backBtnText}>‹</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Phong Cách Nuôi Dạy</Text>
+          <Text style={styles.headerTitle}>Parenting Style</Text>
           <Text style={styles.headerSub}>
-            Câu {currentQ + 1}/{PARENTING_QUESTIONS.length}
+            Q{currentQ + 1}/{PARENTING_QUESTIONS.length}
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.quitBtn}
+          onPress={() =>
+            Alert.alert('Quit Test?', 'Your progress will not be saved.', [
+              { text: 'Continue', style: 'cancel' },
+              { text: 'Quit', style: 'destructive', onPress: () => navigation.goBack() },
+            ])
+          }
+        >
+          <Text style={styles.quitBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.progressContainer}>
@@ -111,7 +121,7 @@ export default function ParentingTestScreen({ navigation }) {
         {/* Question */}
         <View style={styles.questionCard}>
           <View style={styles.questionBadge}>
-            <Text style={styles.questionBadgeText}>Câu {currentQ + 1}</Text>
+            <Text style={styles.questionBadgeText}>Q{currentQ + 1}</Text>
           </View>
           <Text style={styles.questionText}>{question.question}</Text>
         </View>
@@ -153,7 +163,7 @@ export default function ParentingTestScreen({ navigation }) {
 
       <View style={styles.footer}>
         <Button
-          title={isLast ? 'Xem Kết Quả' : 'Tiếp Theo'}
+          title={isLast ? 'View Results' : 'Next'}
           onPress={handleNext}
           disabled={!selected}
           style={styles.nextBtn}
@@ -182,6 +192,15 @@ const styles = StyleSheet.create({
     ...SHADOWS.sm,
   },
   backBtnText: { fontSize: 28, color: COLORS.text, lineHeight: 32 },
+  quitBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFE5E5',
+    borderRadius: RADIUS.md,
+  },
+  quitBtnText: { fontSize: 16, color: '#FF6B6B', fontWeight: '700' },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { ...TYPOGRAPHY.h4, color: COLORS.text },
   headerSub: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },

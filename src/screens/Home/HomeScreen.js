@@ -9,13 +9,13 @@ import {
   RefreshControl,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
-import { getCompletedTests } from '../../utils/storage';
+import { getCompletedTests, getCredits } from '../../utils/storage';
 
 const TEST_CARDS = [
   {
     id: 'parenting',
-    title: 'Phong Cách\nNuôi Dạy Con',
-    description: 'Khám phá phong cách nuôi dạy của bạn và tác động đến con',
+    title: 'Parenting\nStyle',
+    description: 'Discover your parenting style and how it shapes your child',
     emoji: '🧠',
     color: '#6C63FF',
     lightColor: '#E8E6FF',
@@ -25,8 +25,8 @@ const TEST_CARDS = [
   },
   {
     id: 'personality',
-    title: 'Tính Cách Con\nTheo Độ Tuổi',
-    description: 'Hiểu tính cách và nhu cầu phát triển của con theo từng giai đoạn',
+    title: "Child's Personality\nby Age",
+    description: "Understand your child's personality and development needs at each stage",
     emoji: '🌟',
     color: '#FF6B35',
     lightColor: '#FFF0EB',
@@ -36,8 +36,8 @@ const TEST_CARDS = [
   },
   {
     id: 'eq',
-    title: 'Chỉ Số EQ\nCủa Trẻ',
-    description: 'Đánh giá trí tuệ cảm xúc và kỹ năng xã hội của con',
+    title: "Child's EQ\nScore",
+    description: "Assess your child's emotional intelligence and social skills",
     emoji: '💝',
     color: '#FF69B4',
     lightColor: '#FFF0F7',
@@ -50,10 +50,12 @@ const TEST_CARDS = [
 export default function HomeScreen({ navigation }) {
   const [completedTests, setCompletedTests] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+  const [credits, setCredits] = useState(0);
 
   const loadData = async () => {
-    const completed = await getCompletedTests();
+    const [completed, bal] = await Promise.all([getCompletedTests(), getCredits()]);
     setCompletedTests(completed);
+    setCredits(bal);
   };
 
   useEffect(() => {
@@ -77,33 +79,41 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.greeting}>Xin chào, Phụ huynh! 👋</Text>
-            <Text style={styles.headerTitle}>Hiểu Con Hơn</Text>
+            <View style={styles.headerTopRow}>
+              <Text style={styles.greeting}>Hello, Parent! 👋</Text>
+              <TouchableOpacity
+                style={styles.creditBadge}
+                onPress={() => navigation.navigate('IAPScreen', {})}
+              >
+                <Text style={styles.creditBadgeText}>💎 {credits.toFixed(1)}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.headerTitle}>Mindful Guardian</Text>
             <Text style={styles.headerSubtitle}>
-              Các bài test giúp bạn hiểu con và nâng cao kỹ năng nuôi dạy
+              Understand your family through science-based assessments
             </Text>
           </View>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{Object.keys(completedTests).length}</Text>
-              <Text style={styles.statLabel}>Đã hoàn thành</Text>
+              <Text style={styles.statLabel}>Completed</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>3</Text>
-              <Text style={styles.statLabel}>Tổng bài test</Text>
+              <Text style={styles.statLabel}>Total Tests</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>18+</Text>
-              <Text style={styles.statLabel}>Phút</Text>
+              <Text style={styles.statLabel}>Minutes</Text>
             </View>
           </View>
         </View>
 
         {/* Test Cards */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bài Test Dành Cho Bạn</Text>
+          <Text style={styles.sectionTitle}>Tests For You</Text>
           {TEST_CARDS.map((card) => (
             <TouchableOpacity
               key={card.id}
@@ -120,7 +130,7 @@ export default function HomeScreen({ navigation }) {
                   <View style={styles.testCardBadges}>
                     {completedTests[card.id] && (
                       <View style={styles.completedBadge}>
-                        <Text style={styles.completedBadgeText}>✓ Đã làm</Text>
+                        <Text style={styles.completedBadgeText}>✓ Done</Text>
                       </View>
                     )}
                   </View>
@@ -128,11 +138,11 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.testCardTitle}>{card.title}</Text>
                 <Text style={styles.testCardDesc}>{card.description}</Text>
                 <View style={styles.testCardFooter}>
-                  <Text style={styles.testCardMeta}>📝 {card.questions} câu hỏi</Text>
-                  <Text style={styles.testCardMeta}>⏱ ~{card.minutes} phút</Text>
+                  <Text style={styles.testCardMeta}>📝 {card.questions} questions</Text>
+                  <Text style={styles.testCardMeta}>⏱ ~{card.minutes} min</Text>
                   <View style={[styles.startBtn, { backgroundColor: card.color }]}>
                     <Text style={styles.startBtnText}>
-                      {completedTests[card.id] ? 'Làm lại' : 'Bắt đầu'}
+                      {completedTests[card.id] ? 'Redo' : 'Start'}
                     </Text>
                   </View>
                 </View>
@@ -151,13 +161,13 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.familyBannerEmoji}>👨‍👩‍👧‍👦</Text>
             <View style={styles.familyBannerText}>
               <View style={styles.familyBannerRow}>
-                <Text style={styles.familyBannerTitle}>Gói Family Report</Text>
+                <Text style={styles.familyBannerTitle}>Family Report</Text>
                 <View style={styles.hotBadge}>
                   <Text style={styles.hotBadgeText}>HOT</Text>
                 </View>
               </View>
               <Text style={styles.familyBannerSubtitle}>
-                Báo cáo tổng hợp toàn gia đình - Chỉ 49.000đ
+                Complete family analysis — only 2 credits
               </Text>
             </View>
             <Text style={styles.familyBannerArrow}>›</Text>
@@ -166,14 +176,14 @@ export default function HomeScreen({ navigation }) {
 
         {/* Tips Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mẹo Nuôi Dạy Con 💡</Text>
+          <Text style={styles.sectionTitle}>Parenting Tips 💡</Text>
           <View style={styles.tipCard}>
             <Text style={styles.tipEmoji}>🌱</Text>
             <View style={styles.tipContent}>
-              <Text style={styles.tipTitle}>Khen ngợi nỗ lực, không chỉ kết quả</Text>
+              <Text style={styles.tipTitle}>Praise effort, not just results</Text>
               <Text style={styles.tipText}>
-                Thay vì nói "Con thông minh lắm!", hãy nói "Con đã cố gắng rất nhiều!" để giúp con
-                phát triển tư duy tăng trưởng.
+                Instead of saying "You're so smart!", try "You worked so hard!" — this helps your
+                child develop a growth mindset.
               </Text>
             </View>
           </View>
@@ -201,10 +211,26 @@ const styles = StyleSheet.create({
   headerContent: {
     marginBottom: SPACING.lg,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  creditBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+  },
+  creditBadgeText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.textInverse,
+    fontWeight: '700',
+  },
   greeting: {
     ...TYPOGRAPHY.bodySmall,
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
   },
   headerTitle: {
     fontSize: 32,

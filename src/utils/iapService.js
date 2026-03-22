@@ -1,15 +1,94 @@
-import { savePurchase, hasPurchased } from './storage';
-
-// Mock IAP service - replace with expo-in-app-purchases in production
-// expo-in-app-purchases requires native build
+import {
+  initConnection,
+  getProducts,
+  requestPurchase,
+  finishTransaction,
+  purchaseUpdatedListener,
+  purchaseErrorListener,
+  flushFailedPurchasesCachedAsPendingAndroid,
+} from 'react-native-iap';
+import { addCredits, spendCredits, getCredits, savePurchase, saveUnlockedResult, isResultUnlocked } from './storage';
+import { CREDIT_PACKAGES } from '../data/iapProducts';
 
 let isInitialized = false;
 
+// ─── Error Code Mapping ────────────────────────────────────────────────────────
+
+const mapPurchaseError = (error) => {
+  const code = (error?.code || '').toString();
+  const msg = (error?.message || '').toLowerCase();
+
+  if (
+    code === 'E_USER_CANCELLED' ||
+    msg.includes('cancel') ||
+    msg.includes('user cancelled') ||
+    error?.responseCode === 1 // BILLING_RESPONSE_RESULT_USER_CANCELED
+  ) {
+    return { cancelled: true, message: 'Purchase cancelled.' };
+  }
+
+  if (code === 'E_BILLING_UNAVAILABLE' || error?.responseCode === 3) {
+    return {
+      cancelled: false,
+      message:
+        'Google Play billing is unavailable.\nMake sure you are signed in to a Google account with a valid payment method.',
+    };
+  }
+
+  if (code === 'E_ITEM_UNAVAILABLE' || error?.responseCode === 4) {
+    return {
+      cancelled: false,
+      message:
+        'This product is not available yet.\nMake sure the app is published on Google Play and the product is active.',
+    };
+  }
+
+  if (code === 'E_NETWORK_ERROR' || msg.includes('network')) {
+    return {
+      cancelled: false,
+      message: 'Network error. Please check your internet connection and try again.',
+    };
+  }
+
+  if (code === 'E_SERVICE_ERROR' || error?.responseCode === 6) {
+    return {
+      cancelled: false,
+      message: 'Google Play Store service error. Please try again later.',
+    };
+  }
+
+  if (code === 'E_ALREADY_OWNED') {
+    return {
+      cancelled: false,
+      message: 'You already own this item. Try restoring purchases.',
+    };
+  }
+
+  if (code === 'E_DEVELOPER_ERROR' || error?.responseCode === 5) {
+    return {
+      cancelled: false,
+      message:
+        'App configuration error (developer error). Please contact support.',
+    };
+  }
+
+  return {
+    cancelled: false,
+    message: error?.message || 'Purchase failed. Please try again.',
+  };
+};
+
+// ─── Init ──────────────────────────────────────────────────────────────────────
+
 export const initIAP = async () => {
   try {
-    // In production with native build, initialize expo-in-app-purchases here
-    // const { connectAsync } = await import('expo-in-app-purchases');
-    // await connectAsync();
+    await initConnection();
+    // Flush any failed cached purchases on Android to avoid ghost purchases
+    try {
+      await flushFailedPurchasesCachedAsPendingAndroid();
+    } catch (_) {
+      // Non-critical, ignore
+    }
     isInitialized = true;
     return true;
   } catch (error) {
@@ -18,64 +97,140 @@ export const initIAP = async () => {
   }
 };
 
-export const getProducts = async (productIds) => {
-  // In production, fetch real products from store
-  // const { getProductsAsync } = await import('expo-in-app-purchases');
-  // return await getProductsAsync(productIds);
-  return productIds.map((id) => ({ productId: id, available: true }));
+export const disconnectIAP = async () => {
+  isInitialized = false;
 };
 
-export const purchaseProduct = async (productId, onSuccess, onError) => {
+// ─── Load Products From Store ─────────────────────────────────────────────────
+
+export const loadStoreProducts = async () => {
   try {
-    // Simulate IAP flow
-    // In production:
-    // const { purchaseItemAsync } = await import('expo-in-app-purchases');
-    // await purchaseItemAsync(productId);
-
-    // For development/testing - simulate purchase dialog
-    await savePurchase(productId);
-
-    if (onSuccess) onSuccess(productId);
-    return { success: true, productId };
+    if (!isInitialized) await initIAP();
+    const skus = CREDIT_PACKAGES.map((p) => p.id);
+    const products = await getProducts({ skus });
+    return products;
   } catch (error) {
-    console.error('Purchase error:', error);
-    if (onError) onError(error);
-    return { success: false, error };
+    console.error('loadStoreProducts error:', error);
+    return [];
   }
 };
 
+// ─── Purchase Credits ─────────────────────────────────────────────────────────
+
+export const purchaseCredits = async (packageId, credits, onSuccess, onError) => {
+  try {
+    if (!isInitialized) {
+      const ok = await initIAP();
+      if (!ok) {
+        const msg =
+          'Unable to connect to Google Play.\nPlease check your internet connection and Google account setup.';
+        if (onError) onError({ message: msg });
+        return { success: false, error: msg };
+      }
+    }
+
+    // Must fetch product from store before requesting purchase
+    let products = [];
+    let getProductsError = null;
+    try {
+      products = await getProducts({ skus: [packageId] });
+    } catch (e) {
+      console.warn('getProducts error:', e);
+      getProductsError = e;
+    }
+
+    if (!products || products.length === 0) {
+      const debugInfo = getProductsError
+        ? `\n\n[Debug] SKU: ${packageId}\nError code: ${getProductsError?.code || 'N/A'}\nMessage: ${getProductsError?.message || 'N/A'}`
+        : `\n\n[Debug] SKU: ${packageId}\ngetProducts returned empty list`;
+      const msg =
+        'Product not found on Google Play.\nMake sure the app is published and the product is ACTIVE on Play Console.' +
+        debugInfo;
+      if (onError) onError({ message: msg });
+      return { success: false, error: msg };
+    }
+
+    return new Promise((resolve) => {
+      let purchaseSub;
+      let errorSub;
+      let settled = false;
+
+      const settle = (result) => {
+        if (settled) return;
+        settled = true;
+        if (purchaseSub) purchaseSub.remove();
+        if (errorSub) errorSub.remove();
+        resolve(result);
+      };
+
+      purchaseSub = purchaseUpdatedListener(async (purchase) => {
+        if (purchase.productId !== packageId) return;
+        try {
+          await finishTransaction({ purchase, isConsumable: true });
+          const newBalance = await addCredits(credits);
+          await savePurchase(packageId);
+          if (onSuccess) onSuccess({ credits, newBalance });
+          settle({ success: true, credits, newBalance });
+        } catch (e) {
+          const { message } = mapPurchaseError(e);
+          if (onError) onError({ message });
+          settle({ success: false, error: message });
+        }
+      });
+
+      errorSub = purchaseErrorListener((error) => {
+        const { cancelled, message } = mapPurchaseError(error);
+        if (!cancelled && onError) onError({ message });
+        settle({ success: false, cancelled, error: message });
+      });
+
+      requestPurchase({ sku: packageId }).catch((e) => {
+        const { cancelled, message } = mapPurchaseError(e);
+        if (!cancelled && onError) onError({ message });
+        settle({ success: false, cancelled, error: message });
+      });
+    });
+  } catch (error) {
+    console.error('purchaseCredits error:', error);
+    const { cancelled, message } = mapPurchaseError(error);
+    if (!cancelled && onError) onError({ message });
+    return { success: false, cancelled, error: message };
+  }
+};
+
+// ─── Credit Helpers ────────────────────────────────────────────────────────────
+
+export const getBalance = async () => {
+  return await getCredits();
+};
+
+export const hasEnoughCredits = async (cost) => {
+  const balance = await getCredits();
+  return balance >= cost;
+};
+
+export const unlockWithCredits = async (resultType, cost) => {
+  const spent = await spendCredits(cost);
+  if (spent) {
+    await saveUnlockedResult(resultType);
+    return true;
+  }
+  return false;
+};
+
+export const hasAccessToResult = async (resultType) => {
+  return await isResultUnlocked(resultType);
+};
+
+// ─── Restore Purchases ────────────────────────────────────────────────────────
+
 export const restorePurchases = async () => {
   try {
-    // In production:
-    // const { getPurchaseHistoryAsync } = await import('expo-in-app-purchases');
-    // const history = await getPurchaseHistoryAsync();
-    // Restore from history
+    // react-native-iap: getAvailablePurchases fetches past non-consumable purchases
+    // Consumable credits cannot be restored — this is expected Google Play behavior
     return { success: true, restored: [] };
   } catch (error) {
     console.error('Restore error:', error);
     return { success: false, error };
   }
-};
-
-export const checkPurchase = async (productId) => {
-  return await hasPurchased(productId);
-};
-
-export const disconnectIAP = async () => {
-  try {
-    // const { disconnectAsync } = await import('expo-in-app-purchases');
-    // await disconnectAsync();
-    isInitialized = false;
-  } catch (error) {
-    console.error('Disconnect IAP error:', error);
-  }
-};
-
-// Check if Family Report bundle grants access
-export const hasAccessToResult = async (resultType) => {
-  const familyBundle = await hasPurchased('family_report_bundle');
-  if (familyBundle) return true;
-
-  const specificProduct = await hasPurchased(`${resultType}_result_unlock`);
-  return specificProduct;
 };

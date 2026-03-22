@@ -9,35 +9,110 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS } from '../../utils/theme';
 import { PERSONALITY_TYPES, PERSONALITY_ADVICE_BY_AGE } from '../../data/childPersonalityData';
-import { IAP_PRODUCTS } from '../../data/iapProducts';
+import { CREDIT_COSTS } from '../../data/iapProducts';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
-import { hasAccessToResult } from '../../utils/iapService';
+import { hasAccessToResult, unlockWithCredits, getBalance } from '../../utils/iapService';
 import { exportReport } from '../../utils/pdfExport';
+import { spendCredits } from '../../utils/storage';
+
+const COST = CREDIT_COSTS.PERSONALITY_RESULT;
+const PDF_COST = CREDIT_COSTS.EXPORT_PDF;
 
 export default function PersonalityResultScreen({ route, navigation }) {
   const { result, ageGroup } = route.params;
   const [hasAccess, setHasAccess] = useState(false);
+  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
     checkAccess();
   }, []);
 
   const checkAccess = async () => {
-    const access = await hasAccessToResult('personality');
+    const [access, bal] = await Promise.all([hasAccessToResult('personality'), getBalance()]);
     setHasAccess(access);
+    setBalance(bal);
   };
 
-  const handleUnlock = () => {
-    navigation.navigate('IAPScreen', {
-      product: IAP_PRODUCTS.PERSONALITY_RESULT,
-      onSuccess: () => setHasAccess(true),
-    });
+  const handleUnlock = async () => {
+    if (balance < COST) {
+      Alert.alert(
+        'Not enough credits 💎',
+        `Need ${COST} credits to view result.\nBalance: ${balance.toFixed(1)} credits`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Buy credits',
+            onPress: () =>
+              navigation.navigate('IAPScreen', {
+                requiredCredits: COST,
+                onSuccess: () => checkAccess(),
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Confirm unlock',
+      `Use ${COST} credits to view Child Personality result?\nBalance: ${balance.toFixed(1)} credits`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            const success = await unlockWithCredits('personality', COST);
+            if (success) {
+              await checkAccess();
+            } else {
+              Alert.alert('Error', 'Unable to unlock. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleExport = async () => {
-    const exported = await exportReport({ type: 'personality', result });
-    if (!exported.success) Alert.alert('Lỗi', 'Không thể xuất báo cáo.');
+    const currentBalance = await getBalance();
+    if (currentBalance < PDF_COST) {
+      Alert.alert(
+        'Not enough credits',
+        `Need ${PDF_COST} credits to export PDF.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Buy credits',
+            onPress: () => navigation.navigate('IAPScreen', { requiredCredits: PDF_COST }),
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Confirm export',
+      `Use ${PDF_COST} credits to export PDF?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export',
+          onPress: async () => {
+            const exported = await exportReport({ type: 'personality', result });
+            if (!exported.success && !exported.cancelled) {
+              Alert.alert('Export failed', exported.error || 'Unable to export report. Please try again.');
+              return;
+            }
+            if (!exported.cancelled) {
+              const spent = await spendCredits(PDF_COST);
+              await checkAccess();
+              if (!spent) Alert.alert('Warning', 'Export succeeded but credits could not be deducted. Please contact support.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const { primaryType, percentages, primaryTypeId, ageGroupId } = result;
@@ -52,8 +127,14 @@ export default function PersonalityResultScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backBtnText}>‹</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.balanceBadge}
+            onPress={() => navigation.navigate('IAPScreen', {})}
+          >
+            <Text style={styles.balanceBadgeText}>💎 {balance.toFixed(1)}</Text>
+          </TouchableOpacity>
           <Text style={styles.headerEmoji}>{primaryType?.emoji || '🌟'}</Text>
-          <Text style={styles.headerLabel}>Tính cách của bé</Text>
+          <Text style={styles.headerLabel}>Your child's personality</Text>
           <Text style={styles.headerTitle}>{primaryType?.name}</Text>
           <View style={styles.ageTag}>
             <Text style={styles.ageTagText}>
@@ -65,7 +146,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
         <View style={styles.content}>
           {/* Traits */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Đặc Điểm Nổi Bật</Text>
+            <Text style={styles.cardTitle}>Key Traits</Text>
             <Text style={styles.descText}>{primaryType?.description}</Text>
             <View style={styles.traitsRow}>
               {primaryType?.traits?.map((trait, i) => (
@@ -78,7 +159,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
 
           {/* Type Distribution */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Phân Tích Tính Cách</Text>
+            <Text style={styles.cardTitle}>Personality Analysis</Text>
             {Object.entries(percentages || {}).map(([typeId, pct]) => {
               const type = PERSONALITY_TYPES[typeId];
               if (!type) return null;
@@ -103,27 +184,36 @@ export default function PersonalityResultScreen({ route, navigation }) {
           {!hasAccess ? (
             <View style={styles.unlockCard}>
               <Text style={styles.unlockEmoji}>🔒</Text>
-              <Text style={styles.unlockTitle}>Mở Khóa Lời Khuyên Chuyên Sâu</Text>
+              <Text style={styles.unlockTitle}>Unlock In-Depth Advice</Text>
               <Text style={styles.unlockDesc}>
-                Nhận lời khuyên nuôi dưỡng, hoạt động phù hợp và kế hoạch phát triển theo độ tuổi
+                Get parenting tips, recommended activities, and an age-based development plan
               </Text>
-              <View style={styles.unlockFeatures}>
-                {IAP_PRODUCTS.PERSONALITY_RESULT.features.map((f, i) => (
-                  <Text key={i} style={[styles.unlockFeature, { color: accentColor }]}>✓ {f}</Text>
-                ))}
+              <View style={styles.creditCostRow}>
+                <Text style={styles.creditCostLabel}>Cost:</Text>
+                <Text style={[styles.creditCostValue, { color: accentColor }]}>💎 {COST} credit</Text>
+                {balance < COST && (
+                  <Text style={styles.creditShort}>
+                    (Need {(COST - balance).toFixed(1)} more credits)
+                  </Text>
+                )}
               </View>
               <Button
-                title={`Mở Khóa - ${IAP_PRODUCTS.PERSONALITY_RESULT.price}`}
+                title={`Unlock Now — ${COST} Credit`}
                 onPress={handleUnlock}
                 style={[styles.unlockBtn, { backgroundColor: accentColor }]}
               />
+              <TouchableOpacity
+                onPress={() => navigation.navigate('IAPScreen', { requiredCredits: COST })}
+              >
+                <Text style={[styles.buyCreditsLink, { color: accentColor }]}>Buy credits ›</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <>
               {ageAdvice && (
                 <>
                   <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: accentColor }]}>
-                    <Text style={styles.cardTitle}>💡 Lời Khuyên Nuôi Dưỡng</Text>
+                    <Text style={styles.cardTitle}>💡 Parenting Tips</Text>
                     {ageAdvice.tips?.map((tip, i) => (
                       <View key={i} style={styles.listItem}>
                         <Text style={[styles.listDot, { color: accentColor }]}>•</Text>
@@ -133,7 +223,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
                   </Card>
 
                   <Card style={styles.card}>
-                    <Text style={styles.cardTitle}>🎮 Hoạt Động Phù Hợp</Text>
+                    <Text style={styles.cardTitle}>🎮 Recommended Activities</Text>
                     <View style={styles.activitiesRow}>
                       {ageAdvice.activities?.map((act, i) => (
                         <View key={i} style={[styles.activityBadge, { backgroundColor: accentColor + '15' }]}>
@@ -146,7 +236,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
               )}
 
               <Button
-                title="📄 Xuất Báo Cáo PDF"
+                title={`📄 Export PDF Report (${PDF_COST} credit)`}
                 onPress={handleExport}
                 variant="outline"
                 style={styles.exportBtn}
@@ -155,7 +245,7 @@ export default function PersonalityResultScreen({ route, navigation }) {
           )}
 
           <Button
-            title="Làm lại bài test"
+            title="Retake test"
             onPress={() => navigation.replace('PersonalityTest')}
             variant="ghost"
           />
@@ -188,6 +278,16 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   backBtnText: { fontSize: 28, color: COLORS.textInverse, lineHeight: 32 },
+  balanceBadge: {
+    position: 'absolute',
+    top: 52,
+    right: SPACING.md,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+  },
+  balanceBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.textInverse, fontWeight: '700' },
   headerEmoji: { fontSize: 64, marginBottom: SPACING.sm },
   headerLabel: { ...TYPOGRAPHY.bodySmall, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
   headerTitle: { fontSize: 28, fontWeight: '800', color: COLORS.textInverse, marginBottom: 8 },
@@ -203,12 +303,7 @@ const styles = StyleSheet.create({
   cardTitle: { ...TYPOGRAPHY.h4, color: COLORS.text, marginBottom: SPACING.sm },
   descText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, lineHeight: 24, marginBottom: SPACING.sm },
   traitsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  traitBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-  },
+  traitBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1 },
   traitText: { ...TYPOGRAPHY.caption, fontWeight: '600' },
   typeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
   typeEmoji: { fontSize: 20, width: 28 },
@@ -229,9 +324,19 @@ const styles = StyleSheet.create({
   unlockEmoji: { fontSize: 40, marginBottom: SPACING.sm },
   unlockTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, textAlign: 'center', marginBottom: 8 },
   unlockDesc: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.md },
-  unlockFeatures: { alignSelf: 'stretch', marginBottom: SPACING.md },
-  unlockFeature: { ...TYPOGRAPHY.bodySmall, marginBottom: 4, fontWeight: '500' },
-  unlockBtn: { alignSelf: 'stretch' },
+  creditCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  creditCostLabel: { ...TYPOGRAPHY.body, color: COLORS.textSecondary },
+  creditCostValue: { fontSize: 18, fontWeight: '800' },
+  creditShort: { ...TYPOGRAPHY.caption, color: COLORS.secondary, width: '100%', textAlign: 'center' },
+  unlockBtn: { alignSelf: 'stretch', marginBottom: SPACING.sm },
+  buyCreditsLink: { ...TYPOGRAPHY.bodySmall, textDecorationLine: 'underline' },
   listItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   listDot: { fontSize: 16, marginTop: 2 },
   listText: { ...TYPOGRAPHY.body, color: COLORS.textSecondary, flex: 1, lineHeight: 22 },
