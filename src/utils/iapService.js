@@ -1,11 +1,10 @@
 import {
   initConnection,
-  getProducts,
+  fetchProducts,
   requestPurchase,
   finishTransaction,
   purchaseUpdatedListener,
   purchaseErrorListener,
-  flushFailedPurchasesCachedAsPendingAndroid,
 } from 'react-native-iap';
 import { addCredits, spendCredits, getCredits, savePurchase, saveUnlockedResult, isResultUnlocked } from './storage';
 import { CREDIT_PACKAGES } from '../data/iapProducts';
@@ -83,12 +82,6 @@ const mapPurchaseError = (error) => {
 export const initIAP = async () => {
   try {
     await initConnection();
-    // Flush any failed cached purchases on Android to avoid ghost purchases
-    try {
-      await flushFailedPurchasesCachedAsPendingAndroid();
-    } catch (_) {
-      // Non-critical, ignore
-    }
     isInitialized = true;
     return true;
   } catch (error) {
@@ -107,7 +100,7 @@ export const loadStoreProducts = async () => {
   try {
     if (!isInitialized) await initIAP();
     const skus = CREDIT_PACKAGES.map((p) => p.id);
-    const products = await getProducts({ skus });
+    const products = await fetchProducts({ skus });
     return products;
   } catch (error) {
     console.error('loadStoreProducts error:', error);
@@ -133,7 +126,7 @@ export const purchaseCredits = async (packageId, credits, onSuccess, onError) =>
     let products = [];
     let getProductsError = null;
     try {
-      products = await getProducts({ skus: [packageId] });
+      products = await fetchProducts({ skus: [packageId] });
     } catch (e) {
       console.error('getProducts error full:', JSON.stringify(e), e);
       getProductsError = e;
@@ -190,7 +183,7 @@ export const purchaseCredits = async (packageId, credits, onSuccess, onError) =>
         settle({ success: false, cancelled, error: message });
       });
 
-      requestPurchase({ productId: packageId }).catch((e) => {
+      requestPurchase({ request: { android: { skus: [packageId] }, apple: { sku: packageId } } }).catch((e) => {
         const { cancelled, message } = mapPurchaseError(e);
         if (!cancelled && onError) onError({ message });
         settle({ success: false, cancelled, error: message });
