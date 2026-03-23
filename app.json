@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mindful Guardian",
     "slug": "parenting-test",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mindfulguardian.app",
-      "buildNumber": "8"
+      "buildNumber": "9"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
         "backgroundColor": "#6C63FF"
       },
       "package": "com.mindfulguardian.app",
-      "versionCode": 9,
+      "versionCode": 10,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
