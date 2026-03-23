@@ -135,13 +135,19 @@ export const purchaseCredits = async (packageId, credits, onSuccess, onError) =>
     try {
       products = await getProducts({ skus: [packageId] });
     } catch (e) {
-      console.warn('getProducts error:', e);
+      console.error('getProducts error full:', JSON.stringify(e), e);
       getProductsError = e;
     }
 
     if (!products || products.length === 0) {
+      const errName = getProductsError?.name || '';
+      const errCode = getProductsError?.code || getProductsError?.responseCode || 'N/A';
+      const errMsg = getProductsError?.message || 'N/A';
+      const errExtra = getProductsError
+        ? (() => { try { return JSON.stringify(getProductsError); } catch (_) { return ''; } })()
+        : '';
       const debugInfo = getProductsError
-        ? `\n\n[Debug] SKU: ${packageId}\nError code: ${getProductsError?.code || 'N/A'}\nMessage: ${getProductsError?.message || 'N/A'}`
+        ? `\n\n[Debug] SKU: ${packageId}\nType: ${errName}\nCode: ${errCode}\nMessage: ${errMsg}\nDetails: ${errExtra}`
         : `\n\n[Debug] SKU: ${packageId}\ngetProducts returned empty list`;
       const msg =
         'Product not found on Google Play.\nMake sure the app is published and the product is ACTIVE on Play Console.' +
@@ -184,7 +190,7 @@ export const purchaseCredits = async (packageId, credits, onSuccess, onError) =>
         settle({ success: false, cancelled, error: message });
       });
 
-      requestPurchase({ sku: packageId }).catch((e) => {
+      requestPurchase({ productId: packageId }).catch((e) => {
         const { cancelled, message } = mapPurchaseError(e);
         if (!cancelled && onError) onError({ message });
         settle({ success: false, cancelled, error: message });
