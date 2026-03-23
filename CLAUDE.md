@@ -21,7 +21,9 @@ Cập nhật đồng thời **2 file**:
 ### `package.json`
 - `version` — giữ đồng bộ với `expo.version`
 
-Sau đó: `git add -A && git commit && git push -u origin <branch>`
+Sau đó: `git add app.json package.json && git commit && git push -u origin <branch>`
+
+> **Lưu ý quan trọng:** Nếu bản build trước bị lỗi/skip, vẫn phải tăng versionCode. Google Play **từ chối** AAB có versionCode ≤ bản đã upload. Luôn tăng +1 so với lần commit cuối, không dựa vào bản đã lên Play Store.
 
 ## Thông tin project
 
@@ -53,6 +55,8 @@ Sau đó: `git add -A && git commit && git push -u origin <branch>`
 | Kids Parent (cũ) | `com.kidsparent.hieuconhon` | Trên Play Store (deprecated) |
 | Mindful Guardian (mới) | `com.mindfulguardian.app` | Phát triển (EAS Project ID: `fe4bbb03...`) |
 
+---
+
 ## ⚠️ Signing Key Issue — CRITICAL
 
 **Vấn đề xảy ra 2026-03-18:**
@@ -69,9 +73,133 @@ Sau đó: `git add -A && git commit && git push -u origin <branch>`
 - Option A (nhanh): Google Play Console → Setup → App integrity → Request upload key reset
 - Option B (cẩn thận): Retrieve old keystore từ EAS, configure `eas.json` với `credentialsSource: "local"`
 
+---
+
+## ⚠️ react-native-iap v14 — API Thay Đổi Hoàn Toàn
+
+**Áp dụng cho mọi app dùng `react-native-iap >= 14`**
+
+### Các hàm bị đổi tên / xóa
+
+| Cũ (v12/v13) | Mới (v14) | Ghi chú |
+|---|---|---|
+| `getProducts({ skus })` | `fetchProducts({ skus })` | Đổi tên |
+| `flushFailedPurchasesCachedAsPendingAndroid()` | **Xóa** | Bỏ hoàn toàn |
+| `requestPurchase({ sku })` | Xem bên dưới | Đổi hoàn toàn |
+
+### Signature đúng cho `requestPurchase` (v14)
+
+```js
+// Android + iOS
+requestPurchase({
+  request: {
+    android: { skus: [productId] },   // Android dùng 'skus' (array)
+    apple:   { sku: productId },      // iOS dùng 'sku' (string)
+  }
+});
+```
+
+### Import đúng cho v14
+
+```js
+import {
+  initConnection,
+  fetchProducts,          // KHÔNG phải getProducts
+  requestPurchase,
+  finishTransaction,
+  purchaseUpdatedListener,
+  purchaseErrorListener,
+} from 'react-native-iap';
+```
+
+### `finishTransaction` — không đổi
+
+```js
+await finishTransaction({ purchase, isConsumable: true });
+```
+
+### Lỗi thường gặp nếu dùng API cũ
+
+| Lỗi | Nguyên nhân |
+|-----|-------------|
+| `TypeError: undefined is not a function` | Gọi `getProducts` (không tồn tại trong v14) |
+| `Missing purchase request configuration` | Gọi `requestPurchase({ sku })` thay vì `{ request: { android: ... } }` |
+| `Invalid request for Android. The skus property is required` | `requestPurchase({ productId })` — sai field |
+
+---
+
+## ⚠️ Khi tạo app mới tương tự — Checklist
+
+### 1. Setup EAS / Expo
+
+- [ ] Tạo project mới trên https://expo.dev
+- [ ] Lấy `projectId` và điền vào `app.json` → `expo.extra.eas.projectId`
+- [ ] Set `EXPO_TOKEN` và `EXPO_PROJECT_ID` trong GitHub Secrets
+- [ ] **Đặt slug ngay từ đầu và KHÔNG thay đổi** sau khi build lần đầu
+- [ ] Package name (android) và Bundle ID (ios) phải unique, đặt trước khi build
+
+### 2. Cấu hình `app.json` tối thiểu
+
+```json
+{
+  "expo": {
+    "name": "App Name",
+    "slug": "app-slug",          // KHÔNG được đổi sau khi build
+    "version": "1.0.0",
+    "ios": {
+      "bundleIdentifier": "com.yourcompany.appname",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.yourcompany.appname",
+      "versionCode": 1
+    },
+    "extra": {
+      "eas": { "projectId": "..." }
+    },
+    "plugins": [
+      ["react-native-iap", { "paymentProvider": "Play Store" }]
+    ]
+  }
+}
+```
+
+### 3. IAP Setup (nếu dùng in-app purchase)
+
+- [ ] Cài `react-native-iap@14.x` + `react-native-nitro-modules` (peer dep bắt buộc)
+- [ ] Thêm plugin `react-native-iap` vào `app.json` (xem trên)
+- [ ] Tạo sản phẩm trên Google Play Console → **phải ACTIVE** trước khi test purchase
+- [ ] App phải được publish lên ít nhất Internal Testing track mới test được IAP
+- [ ] Dùng API v14 (xem section trên), **không copy code từ tutorial cũ dùng v12/v13**
+
+### 4. GitHub Actions workflow
+
+```yaml
+# .github/workflows/build-android.yml
+on:
+  push:
+    branches: [main, 'claude/**']
+```
+
+- Trigger build tự động khi push lên `main` hoặc `claude/**`
+- Xem log build tại https://expo.dev/accounts/<account>/builds
+
+### 5. Quy trình mỗi lần release
+
+```
+1. Sửa code
+2. Tăng version: app.json (version, versionCode, buildNumber) + package.json (version)
+3. git add app.json package.json <files> && git commit && git push
+4. Merge PR vào main → GitHub Actions tự build
+5. Download APK/AAB từ expo.dev
+6. Upload lên Play Console
+```
+
+---
+
 ## 📋 Git Workflow — REQUIRE CONFIRMATION
 
-**⚠️ RULES TỬ NGÀY 2026-03-18:**
+**⚠️ RULES TỪ NGÀY 2026-03-18:**
 - **KHÔNG tự động push/merge**
 - Mỗi lần thay đổi phải:
   1. Hiển thị danh sách files thay đổi
